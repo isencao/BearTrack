@@ -93,6 +93,34 @@ export default function Home() {
     }
   };
 
+  // --- YENİ: FAVORİ EKLEME FONKSİYONU ---
+  const addFavorite = async (fav: any) => {
+    setIsLoading(true);
+    try {
+      const cleanName = fav.food_name.includes("::") ? fav.food_name.split("::")[1] : fav.food_name;
+      const payload = {
+        food_name: `${mealType}::${cleanName}`,
+        calories: fav.calories,
+        protein: fav.protein,
+        carbs: fav.carbs,
+        fat: fav.fat,
+        date: new Date().toISOString().split('T')[0]
+      };
+
+      await fetch("http://127.0.0.1:8000/api/food/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      fetchData();
+      setIsModalOpen(false);
+    } catch (err) {
+      alert("Favori eklenirken hata oluştu.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const saveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem("bearProfile", JSON.stringify(profile));
@@ -185,6 +213,12 @@ export default function Home() {
     }
     groupedFoods[category].push({ ...food, cleanName });
   });
+
+  // --- YENİ: FAVORİLER LİSTESİ OLUŞTURUCU ---
+  // Geçmiş yiyeceklerin isimlerini al, tekrar edenleri sil, son 6 tanesini seç
+  const favoritesList = Array.from(new Set(foods.map(f => f.food_name.split("::")[1] || f.food_name)))
+    .slice(0, 6)
+    .map(name => foods.find(f => (f.food_name.split("::")[1] || f.food_name) === name));
 
   return (
     <main className="min-h-screen bg-black text-zinc-100 p-6 md:p-12 font-sans selection:bg-yellow-500 selection:text-black">
@@ -384,7 +418,7 @@ export default function Home() {
 
           </div>
 
-          {/* HISTORY CARD - 4 ÖĞÜN TASARIMI EKLENDİ */}
+          {/* HISTORY CARD - 4 ÖĞÜN TASARIMI */}
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 backdrop-blur-md flex flex-col h-full min-h-[500px]">
             <h2 className="text-xl font-bold text-white mb-6">Tüketilenler Listesi</h2>
             <div className="space-y-6 overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-4">
@@ -492,7 +526,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* YENİLENMİŞ AI MODALI (Öğün Seçici Eklendi) */}
+      {/* YENİLENMİŞ AI MODALI (Öğün Seçici ve Favoriler Eklendi) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 backdrop-blur-md">
           <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-10 w-full max-w-lg shadow-[0_0_50px_rgba(0,0,0,0.5)]">
@@ -524,6 +558,26 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* YENİ: SIK YENENLER (FAVORİLER) ALANI */}
+              {favoritesList.length > 0 && (
+                <div>
+                  <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Sık Yenenler ⚡</label>
+                  <div className="flex flex-wrap gap-2">
+                    {favoritesList.map((fav, i) => (
+                      <button 
+                        key={i} 
+                        type="button" 
+                        onClick={() => addFavorite(fav)} 
+                        className="bg-zinc-800 hover:bg-yellow-500 hover:text-black border border-zinc-700 hover:border-yellow-500 px-3 py-2 rounded-lg text-[11px] font-bold transition-all"
+                      >
+                        {fav.food_name.split("::")[1] || fav.food_name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* METİN GİRİŞİ */}
               <div>
                 <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Ne Yedin?</label>
                 <textarea 
