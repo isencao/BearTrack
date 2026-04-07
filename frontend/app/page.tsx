@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link"; 
 
 export default function Home() {
   const [macros, setMacros] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
@@ -7,9 +8,8 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   
-  // ÖĞÜN TİPİ VE AÇIKLAMA
   const [description, setDescription] = useState("");
-  const [mealType, setMealType] = useState("Sabah"); // Varsayılan öğün
+  const [mealType, setMealType] = useState("Sabah"); 
   const [isLoading, setIsLoading] = useState(false);
   
   const [waterIntake, setWaterIntake] = useState(0);
@@ -17,12 +17,15 @@ export default function Home() {
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState({
-    weight: 103,
-    height: 183,
-    age: 23,
-    activity: 1.55, 
-    goal: "cut" 
+    weight: 103, height: 183, age: 23, activity: 1.55, goal: "cut" 
   });
+
+  const getLocalISODate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   useEffect(() => {
     fetchData();
@@ -70,11 +73,15 @@ export default function Home() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const aiRes = await fetch(`http://127.0.0.1:8000/api/food/ai-analyze?description=${encodeURIComponent(description)}`, { method: "POST" });
+      const aiRes = await fetch("http://127.0.0.1:8000/api/food/ai-analyze", { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: description })
+      });
       const aiData = await aiRes.json();
       
-      // MÜHENDİSLİK HİLESİ: Yemeğin adının başına öğün tipini gizlice ekliyoruz
       aiData.food_name = `${mealType}::${aiData.food_name}`;
+      aiData.date = getLocalISODate(selectedDate);
 
       await fetch("http://127.0.0.1:8000/api/food/", {
         method: "POST",
@@ -83,17 +90,15 @@ export default function Home() {
       });
       setIsModalOpen(false);
       setDescription("");
-      setMealType("Sabah"); // Reset
+      setMealType("Sabah"); 
       fetchData();
-      setSelectedDate(new Date()); 
     } catch (err) {
-      alert("AI Analiz hatası!");
+      alert("AI Analiz hatası veya veri formatı uyumsuz!");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- YENİ: FAVORİ EKLEME FONKSİYONU ---
   const addFavorite = async (fav: any) => {
     setIsLoading(true);
     try {
@@ -104,7 +109,7 @@ export default function Home() {
         protein: fav.protein,
         carbs: fav.carbs,
         fat: fav.fat,
-        date: new Date().toISOString().split('T')[0]
+        date: getLocalISODate(selectedDate)
       };
 
       await fetch("http://127.0.0.1:8000/api/food/", {
@@ -140,26 +145,36 @@ export default function Home() {
   const CARB_GOAL = Math.round((CALORIE_GOAL - (PROTEIN_GOAL * 4 + FAT_GOAL * 9)) / 4);
   const WATER_GOAL = Math.round(profile.weight * 35);
 
-  const targetDateStr = selectedDate.toDateString();
+  const targetDateISO = getLocalISODate(selectedDate);
+  
   const displayedFoods = foods.filter((food) => {
-    if (!food.date) return targetDateStr === new Date().toDateString();
-    return new Date(food.date).toDateString() === targetDateStr;
+    if (!food.date) return targetDateISO === getLocalISODate(new Date());
+    return String(food.date).substring(0, 10) === targetDateISO;
   });
 
+  // --- DİNAMİK KALORİ HESABI (Antrenman kalori hedefini genişletir) ---
   let totalCals = 0, totalProt = 0, totalCarbs = 0, totalFats = 0;
+  let burnedFromExercise = 0;
+
   displayedFoods.forEach((f: any) => {
-    totalCals += f.calories;
-    totalProt += f.protein;
-    totalCarbs += f.carbs;
-    totalFats += f.fat;
+    if (f.calories < 0) {
+      burnedFromExercise += Math.abs(f.calories);
+    } else {
+      totalCals += f.calories;
+      totalProt += f.protein;
+      totalCarbs += f.carbs;
+      totalFats += f.fat;
+    }
   });
 
-  const isCalOver = totalCals > CALORIE_GOAL;
+  const DYNAMIC_CALORIE_GOAL = CALORIE_GOAL + burnedFromExercise;
+
+  const isCalOver = totalCals > DYNAMIC_CALORIE_GOAL;
   const isProtOver = totalProt > PROTEIN_GOAL;
   const isCarbOver = totalCarbs > CARB_GOAL;
   const isFatOver = totalFats > FAT_GOAL;
 
-  const calWidth = Math.min((totalCals / CALORIE_GOAL) * 100, 100);
+  const calWidth = Math.min((totalCals / DYNAMIC_CALORIE_GOAL) * 100, 100);
   const protWidth = Math.min((totalProt / PROTEIN_GOAL) * 100, 100);
   const carbWidth = Math.min((totalCarbs / CARB_GOAL) * 100, 100);
   const fatWidth = Math.min((totalFats / FAT_GOAL) * 100, 100);
@@ -187,35 +202,31 @@ export default function Home() {
     }
   };
 
-  // --- ÖĞÜNLERİ KATEGORİLEME (Mühendislik Hilesini Çözme) ---
   const mealCategories = [
     { id: "Sabah", icon: "🌅", title: "Sabah Kahvaltısı" },
     { id: "Öğle", icon: "☀️", title: "Öğle Yemeği" },
     { id: "Ara Öğün", icon: "☕", title: "Ara Öğün / Snack" },
     { id: "Akşam", icon: "🌙", title: "Akşam Yemeği" },
+    { id: "Antrenman", icon: "🔥", title: "Yakılan Enerji (İdman)" },
     { id: "Diğer", icon: "🍽️", title: "Tanımsız (Eski Kayıtlar)" }
   ];
 
-  // Yemekleri gruplara ayıran obje
-  const groupedFoods: Record<string, any[]> = { "Sabah": [], "Öğle": [], "Ara Öğün": [], "Akşam": [], "Diğer": [] };
+  const groupedFoods: Record<string, any[]> = { "Sabah": [], "Öğle": [], "Ara Öğün": [], "Akşam": [], "Antrenman": [], "Diğer": [] };
 
   displayedFoods.forEach((food) => {
     let category = "Diğer";
     let cleanName = food.food_name;
 
-    // Etiket var mı diye kontrol et (Örn: "Sabah::3 Yumurta")
     if (food.food_name && food.food_name.includes("::")) {
       const parts = food.food_name.split("::");
       if (groupedFoods[parts[0]]) {
         category = parts[0];
-        cleanName = parts[1]; // Orijinal temiz isme geri dön
+        cleanName = parts[1]; 
       }
     }
     groupedFoods[category].push({ ...food, cleanName });
   });
 
-  // --- YENİ: FAVORİLER LİSTESİ OLUŞTURUCU ---
-  // Geçmiş yiyeceklerin isimlerini al, tekrar edenleri sil, son 6 tanesini seç
   const favoritesList = Array.from(new Set(foods.map(f => f.food_name.split("::")[1] || f.food_name)))
     .slice(0, 6)
     .map(name => foods.find(f => (f.food_name.split("::")[1] || f.food_name) === name));
@@ -233,6 +244,13 @@ export default function Home() {
             <p className="text-zinc-500 font-medium mt-1 uppercase tracking-widest text-xs">Vanguard Nutrition System</p>
           </div>
           <div className="flex items-center gap-4">
+            <Link 
+              href="/workout"
+              className="bg-red-500/10 border border-red-500/20 hover:bg-red-500 hover:text-white text-red-500 py-2 px-4 rounded-xl transition-all text-sm font-bold flex items-center gap-2"
+            >
+              🏋️ ANTRENMAN
+            </Link>
+
             <button 
               onClick={() => setIsProfileOpen(true)}
               className="bg-zinc-900 border border-zinc-700 hover:border-yellow-500 text-zinc-300 py-2 px-4 rounded-xl transition-all text-sm font-bold flex items-center gap-2"
@@ -298,7 +316,7 @@ export default function Home() {
           {/* SOL SÜTUN */}
           <div className="lg:col-span-2 space-y-8">
             
-            {/* MACRO CARD (KÜSÜRATLAR TEMİZLENDİ) */}
+            {/* MACRO CARD */}
             <div className={`bg-zinc-900/50 border ${isCalOver ? 'border-red-900/50' : 'border-zinc-800'} rounded-3xl p-8 backdrop-blur-md shadow-2xl transition-all`}>
               <div className="flex justify-between items-center mb-10">
                 <h2 className="text-2xl font-bold text-white flex items-center gap-3">
@@ -318,13 +336,13 @@ export default function Home() {
 
               <div className="grid gap-8 md:grid-cols-2">
                 <div className="space-y-8">
-                  {/* KALORİ */}
+                  {/* KALORİ (DİNAMİK) */}
                   <div>
                     <div className="flex justify-between items-end mb-3">
                       <span className="text-zinc-400 font-bold uppercase text-xs tracking-wider">Enerji (kcal)</span>
                       <span className={`text-2xl font-black ${isCalOver ? 'text-red-500' : 'text-yellow-500'}`}>
-                        {totalCals.toFixed(0)} <span className="text-zinc-600 text-sm">/ {CALORIE_GOAL}</span>
-                        {isCalOver && <span className="text-red-500 text-[10px] ml-2 animate-pulse uppercase bg-red-500/10 px-2 py-1 rounded-md border border-red-500/20">Aşım: +{(totalCals - CALORIE_GOAL).toFixed(0)}</span>}
+                        {totalCals.toFixed(0)} <span className="text-zinc-600 text-sm">/ {DYNAMIC_CALORIE_GOAL}</span>
+                        {isCalOver && <span className="text-red-500 text-[10px] ml-2 animate-pulse uppercase bg-red-500/10 px-2 py-1 rounded-md border border-red-500/20">Aşım: +{(totalCals - DYNAMIC_CALORIE_GOAL).toFixed(0)}</span>}
                       </span>
                     </div>
                     <div className="h-4 w-full bg-zinc-800/50 rounded-full overflow-hidden border border-zinc-700/50">
@@ -379,7 +397,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* WATER CARD */}
+            {/* WATER CARD (Kısıtlama Kaldırıldı) */}
             <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 backdrop-blur-md shadow-2xl relative overflow-hidden transition-all">
               <div className="absolute -right-10 -top-10 w-40 h-40 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
               
@@ -402,23 +420,21 @@ export default function Home() {
                 </div>
               </div>
 
-              {selectedDate.toDateString() === new Date().toDateString() && (
-                <div className="flex flex-col gap-3 relative z-10 animate-fade-in">
-                  <div className="flex gap-4">
-                    <button onClick={() => addWater(250)} className="flex-1 bg-zinc-800 hover:bg-cyan-900/50 border border-zinc-700 hover:border-cyan-500 text-cyan-400 font-bold py-4 rounded-2xl transition-all active:scale-95 shadow-lg">+ 250 ml</button>
-                    <button onClick={() => addWater(500)} className="flex-1 bg-zinc-800 hover:bg-cyan-900/50 border border-zinc-700 hover:border-cyan-500 text-cyan-400 font-bold py-4 rounded-2xl transition-all active:scale-95 shadow-lg">+ 500 ml</button>
-                  </div>
-                  <div className="flex gap-4">
-                    <button onClick={() => addWater(-250)} className="flex-1 bg-zinc-900/80 hover:bg-red-900/20 border border-zinc-800/50 hover:border-red-500/50 text-zinc-500 hover:text-red-400 font-bold py-2 rounded-xl transition-all active:scale-95 text-xs">- 250 ml (Geri Al)</button>
-                    <button onClick={() => addWater(-500)} className="flex-1 bg-zinc-900/80 hover:bg-red-900/20 border border-zinc-800/50 hover:border-red-500/50 text-zinc-500 hover:text-red-400 font-bold py-2 rounded-xl transition-all active:scale-95 text-xs">- 500 ml (Geri Al)</button>
-                  </div>
+              <div className="flex flex-col gap-3 relative z-10 animate-fade-in">
+                <div className="flex gap-4">
+                  <button onClick={() => addWater(250)} className="flex-1 bg-zinc-800 hover:bg-cyan-900/50 border border-zinc-700 hover:border-cyan-500 text-cyan-400 font-bold py-4 rounded-2xl transition-all active:scale-95 shadow-lg">+ 250 ml</button>
+                  <button onClick={() => addWater(500)} className="flex-1 bg-zinc-800 hover:bg-cyan-900/50 border border-zinc-700 hover:border-cyan-500 text-cyan-400 font-bold py-4 rounded-2xl transition-all active:scale-95 shadow-lg">+ 500 ml</button>
                 </div>
-              )}
+                <div className="flex gap-4">
+                  <button onClick={() => addWater(-250)} className="flex-1 bg-zinc-900/80 hover:bg-red-900/20 border border-zinc-800/50 hover:border-red-500/50 text-zinc-500 hover:text-red-400 font-bold py-2 rounded-xl transition-all active:scale-95 text-xs">- 250 ml (Geri Al)</button>
+                  <button onClick={() => addWater(-500)} className="flex-1 bg-zinc-900/80 hover:bg-red-900/20 border border-zinc-800/50 hover:border-red-500/50 text-zinc-500 hover:text-red-400 font-bold py-2 rounded-xl transition-all active:scale-95 text-xs">- 500 ml (Geri Al)</button>
+                </div>
+              </div>
             </div>
 
           </div>
 
-          {/* HISTORY CARD - 4 ÖĞÜN TASARIMI */}
+          {/* HISTORY CARD */}
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 backdrop-blur-md flex flex-col h-full min-h-[500px]">
             <h2 className="text-xl font-bold text-white mb-6">Tüketilenler Listesi</h2>
             <div className="space-y-6 overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-4">
@@ -429,10 +445,9 @@ export default function Home() {
                   <p className="text-sm italic text-center">Bu tarihte hiç öğün kaydedilmemiş.</p>
                 </div>
               ) : (
-                // 4 Öğün Kategorisini Ekrana Basıyoruz
                 mealCategories.map((category) => {
                   const foodsInCategory = groupedFoods[category.id];
-                  if (foodsInCategory.length === 0) return null; // Boş öğünleri gizle
+                  if (foodsInCategory.length === 0) return null; 
 
                   return (
                     <div key={category.id} className="mb-6 last:mb-0 animate-fade-in">
@@ -445,24 +460,23 @@ export default function Home() {
                         {foodsInCategory.map((food) => (
                           <div key={food.id} className="relative bg-zinc-800/30 p-4 pr-12 rounded-xl border border-zinc-700/30 flex justify-between items-center group hover:bg-zinc-800/50 transition-colors">
                             <div className="flex-1 min-w-0">
-                              {/* Temizlenmiş (Sabah:: etiketi atılmış) ismi gösteriyoruz */}
                               <p className="text-sm font-bold text-zinc-200 truncate">{food.cleanName}</p>
                               <p className="text-[10px] text-zinc-500 uppercase mt-1">
                                 {food.protein.toFixed(1)}P • {food.carbs.toFixed(1)}C • {food.fat.toFixed(1)}Y
                               </p>
                             </div>
                             <div className="flex items-center flex-shrink-0">
-                              <span className="text-xs font-black text-yellow-500 whitespace-nowrap">{food.calories.toFixed(0)} kcal</span>
+                              <span className="text-xs font-black text-yellow-500 whitespace-nowrap">
+                                {food.calories < 0 ? `🔥 ${Math.abs(food.calories).toFixed(0)}` : food.calories.toFixed(0)} kcal
+                              </span>
                             </div>
-                            {selectedDate.toDateString() === new Date().toDateString() && (
-                              <button 
-                                onClick={() => handleDelete(food.id)}
-                                className="absolute right-4 text-red-500 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:scale-125 transition-all p-2"
-                                title="Öğünü Sil"
-                              >
-                                ✖
-                              </button>
-                            )}
+                            <button 
+                              onClick={() => handleDelete(food.id)}
+                              className="absolute right-4 text-red-500 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:scale-125 transition-all p-2"
+                              title="Öğünü Sil"
+                            >
+                              ✖
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -526,7 +540,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* YENİLENMİŞ AI MODALI (Öğün Seçici ve Favoriler Eklendi) */}
+      {/* AI MODALI */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 backdrop-blur-md">
           <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-10 w-full max-w-lg shadow-[0_0_50px_rgba(0,0,0,0.5)]">
@@ -537,7 +551,6 @@ export default function Home() {
             
             <form onSubmit={handleAISubmit} className="space-y-6">
               
-              {/* ÖĞÜN SEÇİCİ */}
               <div>
                 <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Hangi Öğün?</label>
                 <div className="grid grid-cols-2 gap-3">
@@ -558,7 +571,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* YENİ: SIK YENENLER (FAVORİLER) ALANI */}
               {favoritesList.length > 0 && (
                 <div>
                   <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Sık Yenenler ⚡</label>
@@ -577,14 +589,13 @@ export default function Home() {
                 </div>
               )}
 
-              {/* METİN GİRİŞİ */}
               <div>
                 <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Ne Yedin?</label>
                 <textarea 
                   required 
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Örn: 500g airfryer tavuk göğsü, 1 kase pirinç pilavı..."
+                  placeholder="Örn: 200g ızgara tavuk göğsü, 1 kase pirinç pilavı..."
                   className="w-full bg-black border border-zinc-700 rounded-2xl p-5 text-white focus:outline-none focus:border-yellow-500 min-h-[120px] text-lg transition-all"
                 />
               </div>

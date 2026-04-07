@@ -1,6 +1,10 @@
 from typing import Optional
 from sqlmodel import SQLModel, Field
 import datetime
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime
+from sqlalchemy.orm import relationship
+from datetime import datetime, date as dt_date
+from database import Base
 
 # Kullanıcı Bilgileri
 class User(SQLModel, table=True):
@@ -18,7 +22,7 @@ class FoodEntry(SQLModel, table=True):
     protein: float
     carbs: float
     fat: float
-    date: datetime.date = Field(default_factory=datetime.date.today)
+    date: dt_date = Field(default_factory=dt_date.today)
 
 # Spor Girişleri (Bodybuilding)
 class ExerciseSet(SQLModel, table=True):
@@ -27,4 +31,39 @@ class ExerciseSet(SQLModel, table=True):
     weight: float
     reps: int
     rpe: Optional[int] = None # Zorluk seviyesi (1-10)
-    date: datetime.date = Field(default_factory=datetime.date.today)
+    date: dt_date = Field(default_factory=dt_date.today)
+
+class Workout(Base):
+    __tablename__ = "workouts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True) # Örn: "Push Day (Göğüs, Omuz, Arka Kol)"
+    date = Column(DateTime, default=datetime.utcnow)
+    duration_minutes = Column(Integer, nullable=True) # Örn: 75
+    total_volume = Column(Float, default=0.0) # Toplam kaldırılan tonaj
+    
+    # Alt tablolara bağlantı (Bir antrenmanın birden fazla hareketi olur)
+    exercises = relationship("WorkoutExercise", back_populates="workout", cascade="all, delete-orphan")  
+
+class WorkoutExercise(Base):
+    __tablename__ = "workout_exercises"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    workout_id = Column(Integer, ForeignKey("workouts.id"))
+    name = Column(String, index=True) # Örn: "Barbell Bench Press"
+    
+    workout = relationship("Workout", back_populates="exercises")
+    # Bu hareketin altındaki setlere bağlantı
+    sets = relationship("ExerciseSet", back_populates="exercise", cascade="all, delete-orphan")
+
+class ExerciseSet(Base):
+    __tablename__ = "exercise_sets"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    exercise_id = Column(Integer, ForeignKey("workout_exercises.id"))
+    set_number = Column(Integer) # 1. Set, 2. Set vb.
+    weight = Column(Float)       # 105.0 kg
+    reps = Column(Integer)       # 8 tekrar
+    completed = Column(Boolean, default=False)
+    
+    exercise = relationship("WorkoutExercise", back_populates="sets")
