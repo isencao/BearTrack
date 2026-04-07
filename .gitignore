@@ -57,3 +57,23 @@ frontend/.env.local
 # OS
 .DS_Store
 Thumbs.db
+
+# IDE - Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python Extra
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Database 
+*.db
+*.sqlite3
+
+/pgdata/
+

@@ -1,27 +1,27 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import Session, select
+from sqlmodel import Session, select, desc
 import os
 import json
 from groq import Groq
 from dotenv import load_dotenv
 from typing import List
 from database import create_db_and_tables, get_session
-import models
-from models import FoodEntry, ExerciseSet, User, Workout, WorkoutExercise
+import models  # models.py dosyanın doğru yapılandırıldığından emin ol
 from pydantic import BaseModel
 
 load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-app = FastAPI(title="BearTrack - Vanguard OS v3.6")
+app = FastAPI(title="BearTrack - Vanguard OS v4.0")
 
 class AIRequest(BaseModel):
     description: str
-# 1. ADIM: CORS'U FULL AÇ (Tarayıcı engellini kaldırır)
+
+# CORS AYARLARI (Frontend'in bağlanabilmesi için şart)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Her yerden gelen isteğe izin ver
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,118 +29,91 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup():
-    print("\n[VANGUARD] Veritabanı tabloları kontrol ediliyor...")
+    # Veritabanı tablolarını oluşturur
     create_db_and_tables()
-    print("[VANGUARD] Sistem Online!\n")
+    print("[VANGUARD] Sistem Online! Operatör: Ahmet Furkan")
 
 @app.get("/")
 def read_root():
-    return {"status": "Vanguard Online", "operator": "Ahmet Furkan"}
+    return {"status": "Vanguard Online", "system": "BEAR OS"}
 
-# ---------------------------------------------------------
-# BESLENME KATMANI (KURŞUN GEÇİRMEZ VERSİYON)
-# ---------------------------------------------------------
-
-@app.post("/api/food/")
-def add_food_entry(data: dict, session: Session = Depends(get_session)):
-    print(f"\n[RECEIVE] Beslenme Verisi Geldi: {data}") # Log ekledik!
-    try:
-        new_food = FoodEntry(**data)
-        session.add(new_food)
-        session.commit()
-        session.refresh(new_food)
-        print(f"[SUCCESS] Öğün kaydedildi: ID {new_food.id}")
-        return new_food
-    except Exception as e:
-        print(f"[ERROR] Kayıt hatası: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+# --- BESLENME KATMANI ---
 
 @app.get("/api/food/")
 def get_all_foods(session: Session = Depends(get_session)):
-    print("[FETCH] Tüm öğünler listeleniyor...")
-    return session.exec(select(FoodEntry)).all()
+    return session.exec(select(models.FoodEntry)).all()
+
+@app.post("/api/food/")
+def add_food_entry(data: dict, session: Session = Depends(get_session)):
+    try:
+        new_food = models.FoodEntry(**data)
+        session.add(new_food)
+        session.commit()
+        session.refresh(new_food)
+        return new_food
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Kayıt hatası: {str(e)}")
 
 @app.delete("/api/food/{food_id}")
 def delete_food_entry(food_id: int, session: Session = Depends(get_session)):
-    print(f"[DELETE] Siliniyor: ID {food_id}")
-    food = session.get(FoodEntry, food_id)
+    food = session.get(models.FoodEntry, food_id)
     if not food:
-        raise HTTPException(status_code=404, detail="Bulunamadı")
+        raise HTTPException(status_code=404, detail="Öğün bulunamadı.")
     session.delete(food)
     session.commit()
     return {"status": "deleted"}
 
-@app.post("/api/food/ai-analyze", tags=["AI Katmanı"])
+@app.post("/api/food/ai-analyze")
 def analyze_food(req: AIRequest):
-    description = req.description # Veriyi güvenli kutudan (body) çıkarıyoruz
-    print(f"[AI] Analiz isteği: {description}")
-    
-
     prompt = f"""
-    Sen bir Türk beslenme uzmanı ve veri analizcisisin. Kullanıcının girdiği şu öğünü analiz et: "{description}"
-    
-    ÇOK ÖNEMLİ KURALLAR: 
-    1. Kullanıcı birden fazla yiyecek girdiyse Hepsini toplayarak SADECE TEK BİR JSON OBJESİ döndür. Liste döndürme!
-    2. Gram/ölçü belirtilmediyse standart porsiyon kullan (Örn: 1 ölçek protein tozu = 30g toz, ~24g protein).
-    3. MATEMATİK SAĞLAMASI ZORUNLUDUR: Toplam kalori, makroların formülüne uymak zorundadır!
-       Formül: (protein * 4) + (carbs * 4) + (fat * 9) = Toplam Kalori
-       Önce makroları bul, sonra bu formülle kaloriyi ÇARPARAK hesapla. Asla kafadan kalori uydurma!
-    
-    JSON FORMATI:
+    Kullanıcının girdiği şu öğünü analiz et: "{req.description}"
+    JSON formatında döndür: 
     {{
-        "food_name": "Kısa Özet (Örn: Protein Tozu & Pirinç Unu)",
-        "calories": hesaplanan_toplam_kalori_sayi,
-        "protein": toplam_protein_sayi,
-        "carbs": toplam_karbo_sayi,
-        "fat": toplam_yag_sayi,
-        "calculation_logic": "Matematik formülünü göster (Örn: 24p*4 + 30c*4 + 3y*9 = 243 kcal)"
+        "food_name": "Özet İsim",
+        "calories": toplam_kcal,
+        "protein": g,
+        "carbs": g,
+        "fat": g,
+        "calculation_logic": "mantık açıklaması"
     }}
     """
-    
     try:
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile", 
-            response_format={"type": "json_object"},
-            temperature=0.0 
+            model="llama-3.3-70b-versatile",
+            response_format={"type": "json_object"}
         )
-        
-        result = json.loads(chat_completion.choices[0].message.content)
-        print(f"[AI SUCCESS] Hesap Mantığı: {result.get('calculation_logic')}")
-        return result
+        return json.loads(chat_completion.choices[0].message.content)
     except Exception as e:
-        print(f"[AI ERROR] {str(e)}")
-        raise HTTPException(status_code=400, detail="AI bu öğünü anlayamadı.")
+        raise HTTPException(status_code=500, detail="AI Analiz hatası.")
 
-# ---------------------------------------------------------
-# ANTRENMAN KATMANI (KURŞUN GEÇİRMEZ VERSİYON)
-# ---------------------------------------------------------
+# --- ANTRENMAN KATMANI (GHOST NUMBERS & SESSION SAVE) ---
 
-@app.post("/api/workout/")
-def add_workout_set(data: dict, session: Session = Depends(get_session)):
-    print(f"\n[RECEIVE] Antrenman Verisi Geldi: {data}")
-    try:
-        new_set = ExerciseSet(**data)
-        session.add(new_set)
-        session.commit()
-        session.refresh(new_set)
-        print(f"[SUCCESS] Set kaydedildi: ID {new_set.id}")
-        return new_set
-    except Exception as e:
-        print(f"[ERROR] Antrenman kayıt hatası: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+@app.get("/api/workout/ghost/{name}")
+def get_ghost_data(name: str, session: Session = Depends(get_session)):
+    """Frontend'deki 'Geçmiş' (Ghost) sütunu için verileri getirir."""
+    # Bu harekete ait en son girilen setleri bulur
+    statement = (
+        select(models.ExerciseSet)
+        .join(models.WorkoutExercise)
+        .where(models.WorkoutExercise.name == name)
+        .order_by(desc(models.ExerciseSet.id))
+        .limit(10)
+    )
+    results = session.exec(statement).all()
+    
+    if not results:
+        return {"ghost_sets": []}
+    
+    # "100kg x 8" formatında listeler
+    ghost_list = [f"{r.weight}kg x {r.reps}" for r in results]
+    return {"ghost_sets": ghost_list}
 
-@app.get("/api/workout/")
-def get_all_sets(session: Session = Depends(get_session)):
-    return session.exec(select(ExerciseSet)).all()
-
-@app.post("/api/workout/save-session", tags=["Antrenman Katmanı"])
+@app.post("/api/workout/save-session")
 def save_workout_session(data: dict, session: Session = Depends(get_session)):
-    """
-    Tüm antrenmanı, hareketleri ve setleri hiyerarşik olarak tek seferde kaydeder.
-    """
+    """İdmanı, hareketleri ve tüm setleri tek seferde kaydeder."""
     try:
-        # 1. Antrenman Oturumunu Oluştur
+        # 1. Antrenman Başlığını Oluştur
         workout = models.Workout(
             name=data["name"],
             duration_minutes=int(data.get("duration", 0)),
@@ -150,8 +123,10 @@ def save_workout_session(data: dict, session: Session = Depends(get_session)):
         session.commit()
         session.refresh(workout)
 
-        # 2. Hareketleri ve Setleri Döngüyle Kaydet
+        # 2. Hareketleri ve Setleri İç İçe Kaydet
         for ex_data in data["exercises"]:
+            if not ex_data.get("name"): continue
+            
             exercise = models.WorkoutExercise(
                 workout_id=workout.id,
                 name=ex_data["name"]
@@ -161,14 +136,14 @@ def save_workout_session(data: dict, session: Session = Depends(get_session)):
             session.refresh(exercise)
 
             for set_data in ex_data["sets"]:
-                # Sadece tamamlanmış veya veri girilmiş setleri kaydedelim
+                # Sadece ağırlık veya tekrar girilmişse kaydet
                 if set_data.get("weight") or set_data.get("reps"):
                     new_set = models.ExerciseSet(
                         exercise_id=exercise.id,
-                        set_number=set_data["setNo"],
-                        weight=float(set_data["weight"] or 0),
-                        reps=int(set_data["reps"] or 0),
-                        completed=set_data.get("completed", False)
+                        set_number=int(set_data.get("setNo", 1)),
+                        weight=float(set_data.get("weight") or 0),
+                        reps=int(set_data.get("reps") or 0),
+                        completed=True
                     )
                     session.add(new_set)
         
@@ -176,5 +151,5 @@ def save_workout_session(data: dict, session: Session = Depends(get_session)):
         return {"status": "success", "workout_id": workout.id}
     except Exception as e:
         session.rollback()
-        print(f"SAVE ERROR: {str(e)}")
+        print(f"[ERROR] Kayıt Başarısız: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
