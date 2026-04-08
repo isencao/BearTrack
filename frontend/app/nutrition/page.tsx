@@ -20,6 +20,19 @@ export default function NutritionPage() {
     weight: 103, height: 183, age: 23, activity: 1.55, goal: "cut" 
   });
 
+  // YENİ: Hangi menülerin (Öğle, Akşam vb.) açık olduğunu tutan state. Hepsi başta açık (true) gelir.
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+    "Sabah": true, "Öğle": true, "Ara Öğün": true, "Akşam": true, "Antrenman": true, "Diğer": true
+  });
+
+  // YENİ: Menü başlığına tıklandığında açıp kapatan fonksiyon
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }));
+  };
+
   const getLocalISODate = (date: Date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -100,6 +113,10 @@ export default function NutritionPage() {
       setIsModalOpen(false);
       setDescription("");
       setMealType("Sabah"); 
+      
+      // Yeni eklenen öğünün menüsünü otomatik aç ki kullanıcı görebilsin
+      setExpandedCategories(prev => ({ ...prev, [mealType]: true }));
+      
       fetchData();
     } catch (err) {
       alert("AI Analiz hatası veya veri formatı uyumsuz!");
@@ -126,6 +143,8 @@ export default function NutritionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      
+      setExpandedCategories(prev => ({ ...prev, [mealType]: true }));
       fetchData();
       setIsModalOpen(false);
     } catch (err) {
@@ -444,10 +463,10 @@ export default function NutritionPage() {
 
           </div>
 
-          {/* HISTORY CARD */}
+          {/* HISTORY CARD (Tıklanabilir Accordion) */}
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 backdrop-blur-md flex flex-col h-full min-h-[500px]">
             <h2 className="text-xl font-bold text-white mb-6">Tüketilenler Listesi</h2>
-            <div className="space-y-6 overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-4">
+            <div className="space-y-4 overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-4">
               
               {displayedFoods.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-zinc-600 opacity-50">
@@ -458,38 +477,59 @@ export default function NutritionPage() {
                 mealCategories.map((category) => {
                   const foodsInCategory = groupedFoods[category.id];
                   if (foodsInCategory.length === 0) return null; 
+                  
+                  // YENİ: Bu menü şu an açık mı kapalı mı?
+                  const isExpanded = expandedCategories[category.id];
 
                   return (
-                    <div key={category.id} className="mb-6 last:mb-0 animate-fade-in">
-                      <div className="flex items-center gap-2 mb-3 border-b border-zinc-800 pb-2">
-                        <span className="text-lg">{category.icon}</span>
-                        <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">{category.title}</h3>
+                    <div key={category.id} className="last:mb-0 bg-zinc-950/30 rounded-2xl border border-zinc-800/50 overflow-hidden transition-all duration-300">
+                      
+                      {/* TIKLANABİLİR BAŞLIK (ACCORDION HEADER) */}
+                      <div 
+                        onClick={() => toggleCategory(category.id)}
+                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-800/40 transition-colors group select-none"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl">{category.icon}</span>
+                          <h3 className="text-[11px] font-black text-zinc-400 uppercase tracking-widest group-hover:text-yellow-500 transition-colors">
+                            {category.title}
+                          </h3>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-bold text-zinc-500">{foodsInCategory.length} Öğün</span>
+                          <span className={`text-zinc-500 text-xs transition-transform duration-300 ${isExpanded ? 'rotate-180 text-yellow-500' : ''}`}>
+                            ▼
+                          </span>
+                        </div>
                       </div>
                       
-                      <div className="space-y-3">
-                        {foodsInCategory.map((food) => (
-                          <div key={food.id} className="relative bg-zinc-800/30 p-4 pr-12 rounded-xl border border-zinc-700/30 flex justify-between items-center group hover:bg-zinc-800/50 transition-colors">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold text-zinc-200 truncate">{food.cleanName}</p>
-                              <p className="text-[10px] text-zinc-500 uppercase mt-1">
-                                {food.protein.toFixed(1)}P • {food.carbs.toFixed(1)}C • {food.fat.toFixed(1)}Y
-                              </p>
+                      {/* AÇILAN İÇERİK (ACCORDION CONTENT) */}
+                      {isExpanded && (
+                        <div className="p-4 pt-0 space-y-3 border-t border-zinc-800/30 animate-in slide-in-from-top-2 duration-300">
+                          {foodsInCategory.map((food) => (
+                            <div key={food.id} className="relative bg-zinc-800/40 p-4 pr-12 rounded-xl border border-zinc-700/30 flex justify-between items-center group hover:bg-zinc-800/70 hover:border-yellow-500/30 transition-all">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-zinc-200 truncate">{food.cleanName}</p>
+                                <p className="text-[10px] text-zinc-500 uppercase mt-1">
+                                  {food.protein.toFixed(1)}P • {food.carbs.toFixed(1)}C • {food.fat.toFixed(1)}Y
+                                </p>
+                              </div>
+                              <div className="flex items-center flex-shrink-0">
+                                <span className="text-xs font-black text-yellow-500 whitespace-nowrap">
+                                  {food.calories < 0 ? `🔥 ${Math.abs(food.calories).toFixed(0)}` : food.calories.toFixed(0)} kcal
+                                </span>
+                              </div>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleDelete(food.id); }}
+                                className="absolute right-4 text-red-500 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:scale-125 transition-all p-2"
+                                title="Öğünü Sil"
+                              >
+                                ✖
+                              </button>
                             </div>
-                            <div className="flex items-center flex-shrink-0">
-                              <span className="text-xs font-black text-yellow-500 whitespace-nowrap">
-                                {food.calories < 0 ? `🔥 ${Math.abs(food.calories).toFixed(0)}` : food.calories.toFixed(0)} kcal
-                              </span>
-                            </div>
-                            <button 
-                              onClick={() => handleDelete(food.id)}
-                              className="absolute right-4 text-red-500 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:scale-125 transition-all p-2"
-                              title="Öğünü Sil"
-                            >
-                              ✖
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -499,53 +539,97 @@ export default function NutritionPage() {
         </div>
       </div>
 
-      {/* PROFİL MODALI */}
+      {/* PROFİL VE KALİBRASYON MODALI */}
       {isProfileOpen && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 backdrop-blur-md">
-          <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-10 w-full max-w-lg shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-3xl font-black text-white italic">SİSTEM <span className="text-yellow-500">AYARLARI</span></h3>
-              <button onClick={() => setIsProfileOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl">×</button>
-            </div>
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[100] backdrop-blur-md">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-10 w-full max-w-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row gap-8">
             
-            <form onSubmit={saveProfile} className="space-y-5">
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Kilo (kg)</label>
-                  <input type="number" required value={profile.weight} onChange={(e) => setProfile({...profile, weight: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" />
+            {/* SOL: Veri Girişi */}
+            <div className="flex-1">
+              <div className="flex justify-between items-center mb-8">
+                <h3 className="text-3xl font-black text-white italic">SİSTEM <span className="text-yellow-500">KALİBRASYONU</span></h3>
+                <button onClick={() => setIsProfileOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl md:hidden">×</button>
+              </div>
+              
+              <form onSubmit={saveProfile} className="space-y-5">
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Kilo (kg)</label>
+                    <input type="number" required value={profile.weight} onChange={(e) => setProfile({...profile, weight: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Boy (cm)</label>
+                    <input type="number" required value={profile.height} onChange={(e) => setProfile({...profile, height: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Yaş</label>
+                    <input type="number" required value={profile.age} onChange={(e) => setProfile({...profile, age: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Hedef</label>
+                    <select value={profile.goal} onChange={(e) => setProfile({...profile, goal: e.target.value})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none appearance-none cursor-pointer">
+                      <option value="cut">Definasyon (-500)</option>
+                      <option value="maintain">Koruma (0)</option>
+                      <option value="bulk">Bulk (+500)</option>
+                    </select>
+                  </div>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Boy (cm)</label>
-                  <input type="number" required value={profile.height} onChange={(e) => setProfile({...profile, height: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Yaş</label>
-                  <input type="number" required value={profile.age} onChange={(e) => setProfile({...profile, age: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Hedef</label>
-                  <select value={profile.goal} onChange={(e) => setProfile({...profile, goal: e.target.value})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none appearance-none">
-                    <option value="cut">Definasyon (-500)</option>
-                    <option value="maintain">Koruma</option>
-                    <option value="bulk">Bulk (+500)</option>
+                  <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Aktivite Seviyesi</label>
+                  <select value={profile.activity} onChange={(e) => setProfile({...profile, activity: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none appearance-none cursor-pointer">
+                    <option value={1.2}>Masa Başı / Hareketsiz</option>
+                    <option value={1.375}>Hafif Egzersiz (1-3 gün)</option>
+                    <option value={1.55}>Orta Egzersiz (3-5 gün)</option>
+                    <option value={1.725}>Ağır Egzersiz (6-7 gün)</option>
                   </select>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Aktivite Seviyesi</label>
-                <select value={profile.activity} onChange={(e) => setProfile({...profile, activity: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none appearance-none">
-                  <option value={1.2}>Masa Başı / Hareketsiz</option>
-                  <option value={1.375}>Hafif Egzersiz (1-3 gün)</option>
-                  <option value={1.55}>Orta Egzersiz (3-5 gün)</option>
-                  <option value={1.725}>Ağır Egzersiz (6-7 gün)</option>
-                </select>
-              </div>
+                <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl transition-all text-lg mt-4 shadow-[0_0_20px_rgba(234,179,8,0.2)]">
+                  KALİBRASYONU ONAYLA
+                </button>
+              </form>
+            </div>
 
-              <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl transition-all text-lg mt-4">
-                SİSTEMİ GÜNCELLE
-              </button>
-            </form>
+            {/* SAĞ: Canlı Önizleme Paneli */}
+            <div className="w-full md:w-64 bg-black/50 rounded-2xl p-6 border border-zinc-800 flex flex-col justify-center relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4">
+                <button onClick={() => setIsProfileOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl hidden md:block">×</button>
+              </div>
+              
+              <h4 className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-6 border-b border-zinc-800 pb-2">CANLI HESAPLAMA</h4>
+              
+              <div className="space-y-4">
+                <div>
+                  <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">Bazal (BMR)</p>
+                  <p className="text-lg font-black text-zinc-300">{BMR.toFixed(0)} <span className="text-xs text-zinc-600">kcal</span></p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">Günlük İhtiyaç (TDEE)</p>
+                  <p className="text-lg font-black text-zinc-300">{TDEE.toFixed(0)} <span className="text-xs text-zinc-600">kcal</span></p>
+                </div>
+                <div className="pt-2 border-t border-zinc-800/50">
+                  <p className="text-xs text-yellow-500 uppercase font-black tracking-wider mb-1">HEDEF MAKROLAR</p>
+                  <p className="text-2xl font-black text-white">{CALORIE_GOAL} <span className="text-xs text-zinc-500">kcal</span></p>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-2 pt-2">
+                  <div className="bg-zinc-800/50 rounded-lg p-2 text-center border border-zinc-700/30">
+                    <p className="text-[9px] text-blue-400 font-bold uppercase mb-1">PRO</p>
+                    <p className="text-sm font-black text-white">{PROTEIN_GOAL}g</p>
+                  </div>
+                  <div className="bg-zinc-800/50 rounded-lg p-2 text-center border border-zinc-700/30">
+                    <p className="text-[9px] text-emerald-400 font-bold uppercase mb-1">KARB</p>
+                    <p className="text-sm font-black text-white">{CARB_GOAL}g</p>
+                  </div>
+                  <div className="bg-zinc-800/50 rounded-lg p-2 text-center border border-zinc-700/30">
+                    <p className="text-[9px] text-orange-400 font-bold uppercase mb-1">YAĞ</p>
+                    <p className="text-sm font-black text-white">{FAT_GOAL}g</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       )}

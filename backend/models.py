@@ -1,22 +1,12 @@
-# models.py
-from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
-import datetime
-
-class FoodEntry(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    food_name: str
-    calories: float
-    protein: float
-    carbs: float
-    fat: float
-    date: datetime.date = Field(default_factory=datetime.date.today)
+from typing import List, Optional
+from datetime import datetime
 
 class Workout(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
-    date: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
-    duration_minutes: Optional[int] = None
+    date: datetime = Field(default_factory=datetime.now)
+    duration_minutes: int = 0
     total_volume: float = 0.0
     exercises: List["WorkoutExercise"] = Relationship(back_populates="workout")
 
@@ -24,7 +14,7 @@ class WorkoutExercise(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     workout_id: int = Field(foreign_key="workout.id")
     name: str
-    workout: Optional[Workout] = Relationship(back_populates="exercises")
+    workout: Workout = Relationship(back_populates="exercises")
     sets: List["ExerciseSet"] = Relationship(back_populates="exercise")
 
 class ExerciseSet(SQLModel, table=True):
@@ -34,4 +24,13 @@ class ExerciseSet(SQLModel, table=True):
     weight: float
     reps: int
     completed: bool = False
-    exercise: Optional[WorkoutExercise] = Relationship(back_populates="sets")
+    exercise: WorkoutExercise = Relationship(back_populates="sets")
+
+class FoodEntry(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    food_name: str
+    calories: float
+    protein: float
+    carbs: float
+    fat: float
+    date: str
