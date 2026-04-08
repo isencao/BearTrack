@@ -7,8 +7,21 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function WorkoutPage() {
   const router = useRouter();
   
-  // --- SABİT API URL'Sİ (VANGUARD GÜVENLİĞİ) ---
+  // --- SABİT API URL'Sİ (BEARGUARD GÜVENLİĞİ) ---
   const API_BASE = "http://127.0.0.1:8000";
+  
+  // --- AUTH (TOKEN) DURUMU ---
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const savedToken = localStorage.getItem("bearToken");
+    if (savedToken) setToken(savedToken);
+  }, []);
+
+  const authHeaders = { 
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}` 
+  };
   
   // --- TEMEL DURUMLAR (STATE) ---
   const [workoutName, setWorkoutName] = useState("");
@@ -90,9 +103,9 @@ export default function WorkoutPage() {
 
   // --- API BAĞLANTILARI VE FONKSİYONLAR ---
   const fetchGhostData = async (exerciseId: number, exerciseName: string) => {
-    if (!exerciseName || exerciseName.trim() === "") return;
+    if (!exerciseName || exerciseName.trim() === "" || !token) return;
     try {
-      const res = await fetch(`${API_BASE}/api/workout/ghost/${encodeURIComponent(exerciseName)}`);
+      const res = await fetch(`${API_BASE}/api/workout/ghost/${encodeURIComponent(exerciseName)}`, { headers: authHeaders });
       if (res.ok) {
         const data = await res.json();
         if (data.ghost_sets && data.ghost_sets.length > 0) {
@@ -109,8 +122,9 @@ export default function WorkoutPage() {
 
   const fetchChartData = async (exerciseName: string) => {
     if (!exerciseName.trim()) return alert("⚠️ Grafiği çizmek için önce bir hareket ismi girmelisin.");
+    if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/api/workout/analytics/1rm/${encodeURIComponent(exerciseName)}`);
+      const res = await fetch(`${API_BASE}/api/workout/analytics/1rm/${encodeURIComponent(exerciseName)}`, { headers: authHeaders });
       if (res.ok) {
         const data = await res.json();
         if (data.length === 0) return alert("Bu hareket için henüz yeterli geçmiş veri yok.");
@@ -118,9 +132,9 @@ export default function WorkoutPage() {
         setActiveExerciseForChart(exerciseName);
         setIsChartOpen(true);
       } else {
-        alert("Backend sunucusu yanıt vermedi (404/500). main.py dosyasını güncelledin mi?");
+        alert("Backend sunucusu yanıt vermedi.");
       }
-    } catch (err) { alert(`Analiz verisi çekilemedi. Backend açık mı?`); }
+    } catch (err) { alert(`Analiz verisi çekilemedi.`); }
   };
 
   const saveAsTemplate = () => {
@@ -164,7 +178,6 @@ export default function WorkoutPage() {
   };
 
   const updateSet = (exerciseId: number, setId: number, field: string, value: string) => {
-    // Negatif değerleri engelle (Eğer kopyala/yapıştır ile gelirse diye ekstra güvenlik)
     const safeValue = Number(value) < 0 ? "0" : value;
     setExercises(exercises.map(ex => ex.id === exerciseId ? { ...ex, sets: ex.sets.map(s => s.id === setId ? { ...s, [field]: safeValue } : s) } : ex));
   };
@@ -173,6 +186,7 @@ export default function WorkoutPage() {
 
   const saveWorkout = async () => {
     if (!workoutName) return alert("Lütfen idman tipini girin!");
+    if (!token) return alert("Oturum süresi dolmuş.");
     setIsLoading(true);
     
     const workoutPayload = {
@@ -190,40 +204,37 @@ export default function WorkoutPage() {
     };
 
     try {
-      const res1 = await fetch(`${API_BASE}/api/workout/save-session`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(workoutPayload) });
-      const res2 = await fetch(`${API_BASE}/api/food/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(foodPayload) });
+      const res1 = await fetch(`${API_BASE}/api/workout/save-session`, { method: "POST", headers: authHeaders, body: JSON.stringify(workoutPayload) });
+      const res2 = await fetch(`${API_BASE}/api/food/`, { method: "POST", headers: authHeaders, body: JSON.stringify(foodPayload) });
       
       if(res1.ok && res2.ok) router.push("/nutrition"); 
       else alert("Veri kaydedilirken hata oluştu!");
-    } catch (err) { alert(`Sunucuya ulaşılamıyor! API URL: ${API_BASE}`); } finally { setIsLoading(false); }
+    } catch (err) { alert(`Sunucuya ulaşılamıyor!`); } finally { setIsLoading(false); }
   };
 
-  // Klavyeden - ve e harfi girilmesini engelleyen yardımcı fonksiyon
   const preventInvalidKeys = (e: any) => {
-    if (e.key === '-' || e.key === 'e' || e.key === '+' || e.key === '.') {
-      e.preventDefault();
-    }
+    if (e.key === '-' || e.key === 'e' || e.key === '+' || e.key === '.') e.preventDefault();
   };
 
   return (
-    <main className="min-h-screen bg-black text-zinc-100 p-4 md:p-12 font-sans selection:bg-yellow-500 selection:text-black relative pb-32">
+    <main className="min-h-screen bg-black text-zinc-100 p-4 md:p-12 font-sans selection:bg-red-600 selection:text-white relative pb-32">
       <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
         
         {/* HEADER */}
         <header className="flex justify-between items-center pb-4">
           <Link href="/">
-            <h1 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white hover:opacity-80 transition-opacity cursor-pointer">
-              BEAR<span className="text-yellow-500">IRON</span>
+            <h1 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white hover:text-red-600 transition-all cursor-pointer">
+              BEAR<span className="text-red-600">IRON</span>
             </h1>
           </Link>
-          <Link href="/nutrition" className="bg-zinc-900 border border-zinc-800 hover:border-yellow-500 text-zinc-400 py-2 px-4 rounded-xl transition-all text-xs font-bold">
+          <Link href="/nutrition" className="bg-zinc-900 border border-zinc-800 hover:border-red-600 text-zinc-400 py-2 px-4 rounded-xl transition-all text-xs font-black uppercase tracking-widest">
             🍽️ BESLENME
           </Link>
         </header>
 
-        {/* TEMPLATE (ŞABLON) ŞERİDİ */}
+        {/* ŞABLON ŞERİDİ */}
         <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden items-center">
-          <button onClick={resetWorkout} className="whitespace-nowrap px-4 py-2 bg-red-900/20 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-all text-xs font-black rounded-lg">
+          <button onClick={resetWorkout} className="whitespace-nowrap px-4 py-2 bg-zinc-900/40 border border-zinc-800 text-red-600 hover:bg-red-600 hover:text-white transition-all text-xs font-black rounded-lg">
             🔄 SIFIRLA
           </button>
           
@@ -231,42 +242,40 @@ export default function WorkoutPage() {
 
           {templates.map((t, i) => (
             <div key={i} className="flex items-center bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden group flex-shrink-0">
-              <button type="button" onClick={() => loadTemplate(t)} className="px-4 py-2 text-xs font-bold text-yellow-500 hover:bg-zinc-800 transition-all">
+              <button type="button" onClick={() => loadTemplate(t)} className="px-4 py-2 text-xs font-bold text-zinc-300 hover:text-red-600 transition-all">
                 ⚡ {t.name}
               </button>
-              <button type="button" onClick={() => deleteTemplate(t.name)} className="px-3 py-2 text-xs text-zinc-600 hover:text-red-500 hover:bg-red-900/20 transition-all border-l border-zinc-800">
+              <button type="button" onClick={() => deleteTemplate(t.name)} className="px-3 py-2 text-xs text-zinc-600 hover:text-red-600 hover:bg-red-900/20 transition-all border-l border-zinc-800">
                 ✕
               </button>
             </div>
           ))}
-          <button onClick={saveAsTemplate} className="whitespace-nowrap px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-black rounded-lg transition-all shadow-lg ml-2 flex-shrink-0">
+          <button onClick={saveAsTemplate} className="whitespace-nowrap px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-black rounded-lg transition-all shadow-lg ml-2 flex-shrink-0">
             + ŞABLON KAYDET
           </button>
         </div>
 
-        {/* DASHBOARD */}
-        <div className="bg-zinc-900/40 border border-zinc-800 rounded-3xl p-5 backdrop-blur-xl flex flex-col md:flex-row items-center gap-4 shadow-xl">
+        {/* DASHBOARD - BEARIRON KIRMIZISI */}
+        <div className="bg-zinc-900/40 border border-zinc-800 rounded-3xl p-5 backdrop-blur-xl flex flex-col md:flex-row items-center gap-4 shadow-xl border-l-4 border-l-red-600">
           <input 
             type="text" placeholder="İdman Tipi (Örn: Push Day)" value={workoutName} onChange={(e) => setWorkoutName(e.target.value)}
-            // BURASI AYDINLATILDI: bg-zinc-800/50 eklendi
-            className="w-full md:flex-1 bg-zinc-800/50 text-2xl font-black text-white focus:outline-none focus:bg-zinc-800 focus:text-yellow-500 uppercase italic placeholder:text-zinc-500 border border-zinc-700/50 rounded-xl p-3 transition-all"
+            className="w-full md:flex-1 bg-zinc-800/50 text-2xl font-black text-white focus:outline-none focus:bg-zinc-800 focus:text-red-600 uppercase italic placeholder:text-zinc-700 border border-zinc-700/50 rounded-xl p-3 transition-all"
           />
           <div className="w-full md:w-auto flex gap-3 items-center justify-between mt-2 md:mt-0">
             <div className="flex flex-col">
               <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest pl-1">Şiddet</span>
-              <select value={intensity} onChange={(e) => setIntensity(Number(e.target.value))} className="w-20 bg-zinc-800 border border-zinc-700 rounded-xl p-2 text-zinc-300 font-bold outline-none focus:border-yellow-500 cursor-pointer text-center">
+              <select value={intensity} onChange={(e) => setIntensity(Number(e.target.value))} className="w-20 bg-zinc-800 border border-zinc-700 rounded-xl p-2 text-zinc-300 font-bold outline-none focus:border-red-600 cursor-pointer text-center">
                 <option value={3.5}>Hafif</option><option value={5.0}>Orta</option><option value={6.5}>Ağır</option>
               </select>
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest pl-1">Süre (Dk)</span>
-              {/* BURAYA min="1" VE onKeyDown EKLENDİ */}
-              <input type="number" min="1" onKeyDown={preventInvalidKeys} placeholder="Dk" value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="w-16 bg-zinc-800 border border-zinc-700 rounded-xl p-2 text-center text-white font-bold outline-none focus:border-yellow-500 transition-all" />
+              <input type="number" min="1" onKeyDown={preventInvalidKeys} placeholder="Dk" value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="w-16 bg-zinc-800 border border-zinc-700 rounded-xl p-2 text-center text-white font-bold outline-none focus:border-red-600 transition-all" />
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] text-red-500 font-bold uppercase tracking-widest pl-1">🔥 KCAL</span>
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl flex items-center px-2 py-1.5 focus-within:border-red-500 transition-all">
-                <input type="number" min="0" onKeyDown={preventInvalidKeys} value={burnedCalories || ""} onChange={(e) => setBurnedCalories(Number(e.target.value))} className="w-16 bg-transparent text-red-500 font-black text-lg outline-none text-center" />
+              <span className="text-[10px] text-red-600 font-bold uppercase tracking-widest pl-1">🔥 KCAL</span>
+              <div className="bg-red-600/10 border border-red-600/20 rounded-xl flex items-center px-2 py-1.5 focus-within:border-red-600 transition-all">
+                <input type="number" min="0" onKeyDown={preventInvalidKeys} value={burnedCalories || ""} className="w-16 bg-transparent text-red-600 font-black text-lg outline-none text-center" readOnly />
               </div>
             </div>
           </div>
@@ -274,14 +283,14 @@ export default function WorkoutPage() {
 
         <div className="flex justify-end">
            <span className="bg-zinc-900 border border-zinc-800 px-4 py-1.5 rounded-full text-xs font-black text-zinc-500 tracking-widest uppercase shadow-md">
-             TOPLAM SET: <span className="text-yellow-500">{totalSets}</span>
+             TOPLAM SET: <span className="text-red-600">{totalSets}</span>
            </span>
         </div>
 
         {/* HAREKETLER LİSTESİ */}
         <div className="space-y-6">
           {exercises.map((exercise, index) => (
-            <div key={exercise.id} className="bg-zinc-900/20 border border-zinc-800/50 rounded-[2rem] p-4 relative group">
+            <div key={exercise.id} className="bg-zinc-900/30 border border-zinc-800/50 rounded-[2.5rem] p-6 relative group transition-all hover:border-red-600/30">
               
               <div className="flex items-center justify-between mb-4 border-b border-zinc-800/50 pb-3">
                 <input 
@@ -290,17 +299,16 @@ export default function WorkoutPage() {
                   value={exercise.name} 
                   onChange={(e) => updateExerciseName(exercise.id, e.target.value)}
                   onBlur={() => fetchGhostData(exercise.id, exercise.name)} 
-                  // BURASI AYDINLATILDI: Arka plan hafif gri yapıldı, placeholder belirginleştirildi
-                  className="flex-1 bg-zinc-800/40 text-xl font-black text-yellow-500 focus:outline-none focus:bg-zinc-800 border border-zinc-700/50 rounded-lg px-3 py-2 uppercase placeholder:text-zinc-500 transition-all"
+                  className="flex-1 bg-zinc-800/40 text-xl font-black text-red-600 focus:outline-none focus:bg-zinc-800 border border-zinc-700/50 rounded-lg px-3 py-2 uppercase placeholder:text-zinc-700 transition-all"
                 />
                 <div className="flex items-center gap-2 ml-3">
                   <button 
                     onClick={() => fetchChartData(exercise.name)} 
-                    className="text-[10px] bg-blue-500/10 text-blue-500 border border-blue-500/20 hover:bg-blue-500 hover:text-white px-3 py-2 rounded-lg font-bold transition-all"
+                    className="text-[10px] bg-red-600/10 text-red-600 border border-red-600/20 hover:bg-red-600 hover:text-white px-3 py-2 rounded-lg font-black tracking-widest transition-all"
                   >
                     📈 ANALİZ
                   </button>
-                  <button onClick={() => removeExercise(exercise.id)} className="text-zinc-600 hover:text-red-500 px-2 text-xl">✖</button>
+                  <button onClick={() => removeExercise(exercise.id)} className="text-zinc-600 hover:text-red-600 px-2 text-xl">✖</button>
                 </div>
               </div>
 
@@ -318,78 +326,76 @@ export default function WorkoutPage() {
                 {exercise.sets.map((set, setIndex) => {
                   const oneRepMax = calculate1RM(Number(set.weight), Number(set.reps));
                   return (
-                    <div key={set.id} className="flex items-center justify-between py-2 border-b border-zinc-800/30 hover:bg-zinc-800/40 transition-colors px-2 rounded-xl group/set">
+                    <div key={set.id} className="flex items-center justify-between py-2 border-b border-zinc-800/30 hover:bg-red-600/5 transition-colors px-2 rounded-xl group/set">
                       <div className="w-8 flex justify-center"><span className="text-zinc-500 font-bold text-sm">{setIndex + 1}</span></div>
                       <div className="flex-1 text-center text-zinc-500 font-bold text-[11px] uppercase tracking-widest px-1">
                         {set.ghost && set.ghost !== "-" ? `👻 ${set.ghost}` : "-"}
                       </div>
                       
-                      {/* SET KG INPUT'U (AYDINLATILDI VE NEGATİF ENGELLENDİ) */}
                       <input 
                         type="number" min="0" onKeyDown={preventInvalidKeys} placeholder="0" value={set.weight} onChange={(e) => updateSet(exercise.id, set.id, "weight", e.target.value)} 
-                        className="w-16 bg-zinc-800/60 border border-zinc-700/50 text-white font-black text-lg text-center outline-none placeholder:text-zinc-600 focus:text-yellow-500 focus:bg-zinc-700 focus:border-yellow-500 rounded-lg py-1 shadow-inner transition-all" 
+                        className="w-16 bg-zinc-800/60 border border-zinc-700/50 text-white font-black text-lg text-center outline-none placeholder:text-zinc-700 focus:text-red-600 focus:bg-zinc-700 focus:border-red-600 rounded-lg py-1 shadow-inner transition-all" 
                       />
                       
                       <span className="w-6 text-center text-zinc-600 font-black">×</span>
                       
-                      {/* SET TEKRAR INPUT'U (AYDINLATILDI VE NEGATİF ENGELLENDİ) */}
                       <input 
                         type="number" min="0" onKeyDown={preventInvalidKeys} placeholder="0" value={set.reps} onChange={(e) => updateSet(exercise.id, set.id, "reps", e.target.value)} 
-                        className="w-16 bg-zinc-800/60 border border-zinc-700/50 text-white font-black text-lg text-center outline-none placeholder:text-zinc-600 focus:text-yellow-500 focus:bg-zinc-700 focus:border-yellow-500 rounded-lg py-1 shadow-inner transition-all" 
+                        className="w-16 bg-zinc-800/60 border border-zinc-700/50 text-white font-black text-lg text-center outline-none placeholder:text-zinc-700 focus:text-red-600 focus:bg-zinc-700 focus:border-red-600 rounded-lg py-1 shadow-inner transition-all" 
                       />
                       
                       <div className="w-10 flex flex-col items-center justify-center">
-                        {oneRepMax > 0 && <span className="text-[10px] text-yellow-600 font-black bg-yellow-900/20 px-1.5 py-0.5 rounded" title="1 Rep Max">★{oneRepMax}</span>}
+                        {oneRepMax > 0 && <span className="text-[10px] text-red-600 font-black bg-red-600/20 px-1.5 py-0.5 rounded">★{oneRepMax}</span>}
                       </div>
-                      <button onClick={() => removeSet(exercise.id, set.id)} className="w-8 text-zinc-600 hover:text-red-500 flex justify-center text-lg transition-colors">✖</button>
+                      <button onClick={() => removeSet(exercise.id, set.id)} className="w-8 text-zinc-600 hover:text-red-600 flex justify-center text-lg transition-colors">✖</button>
                     </div>
                   );
                 })}
               </div>
-              <button onClick={() => addSet(exercise.id)} className="mt-4 text-xs font-bold text-zinc-400 bg-zinc-800/30 hover:bg-zinc-800 hover:text-yellow-500 border border-zinc-700/30 uppercase tracking-widest flex items-center justify-center gap-2 py-2 w-full rounded-lg transition-all">
-                <span className="text-lg leading-none mb-0.5">+</span> YENİ SET EKLE
+              <button onClick={() => addSet(exercise.id)} className="mt-4 text-[10px] font-black text-zinc-500 hover:text-red-600 flex items-center justify-center gap-2 py-2 w-full transition-all uppercase tracking-[0.2em]">
+                + YENİ SET EKLE
               </button>
             </div>
           ))}
         </div>
 
         <div className="flex flex-col gap-3 pt-4">
-          <button onClick={addExercise} className="w-full bg-zinc-900 border border-zinc-700 hover:border-zinc-500 hover:text-white text-zinc-400 font-bold py-4 rounded-2xl transition-all text-xs uppercase tracking-widest">
+          <button onClick={addExercise} className="w-full bg-zinc-900 border border-zinc-800 hover:border-zinc-600 text-zinc-500 font-black py-4 rounded-2xl transition-all text-xs uppercase tracking-[0.3em]">
             + YENİ HAREKET EKLE
           </button>
-          <button onClick={saveWorkout} disabled={isLoading} className="relative z-20 w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-5 rounded-2xl transition-all shadow-[0_0_30px_rgba(234,179,8,0.2)] active:scale-95 text-sm md:text-lg uppercase tracking-widest">
+          <button onClick={saveWorkout} disabled={isLoading} className="relative z-20 w-full bg-red-600 hover:bg-red-500 text-white font-black py-5 rounded-2xl transition-all shadow-[0_0_30px_rgba(220,38,38,0.3)] active:scale-95 text-lg uppercase tracking-widest">
             {isLoading ? "SİSTEME İŞLENİYOR..." : "İDMANI BİTİR VE ARŞİVLE 🚀"} 
           </button>
         </div>
       </div>
 
-      {/* DİNLENME SAYACI */}
+      {/* DİNLENME SAYACI - KIRMIZI VARYANT */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center bg-zinc-900/90 backdrop-blur-md border border-zinc-700 p-2 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.8)]">
         {timer > 0 ? (
           <>
-            <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse ml-4"></div>
-            <span className="text-yellow-500 font-black text-2xl tracking-widest w-20 text-center">{formatTime(timer)}</span>
-            <button onClick={stopTimer} className="bg-red-500/20 text-red-500 p-3 rounded-full hover:bg-red-500 hover:text-white transition-colors">✖</button>
+            <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse ml-4"></div>
+            <span className="text-red-600 font-black text-2xl tracking-widest w-20 text-center">{formatTime(timer)}</span>
+            <button onClick={stopTimer} className="bg-red-600/20 text-red-600 p-3 rounded-full hover:bg-red-600 hover:text-white transition-colors">✖</button>
           </>
         ) : (
           <div className="flex items-center">
-            <span className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest ml-4 mr-3 hidden md:block">⏱️ DİNLEN:</span>
+            <span className="text-zinc-500 font-black text-[10px] uppercase tracking-widest ml-4 mr-3 hidden md:block">⏱️ DİNLEN:</span>
             <div className="flex gap-1">
-              <button onClick={() => startTimer(60)} className="bg-zinc-800 hover:bg-yellow-500 hover:text-black text-zinc-300 px-4 py-2.5 rounded-full text-xs font-black transition-all">60s</button>
-              <button onClick={() => startTimer(90)} className="bg-zinc-800 hover:bg-yellow-500 hover:text-black text-zinc-300 px-4 py-2.5 rounded-full text-xs font-black transition-all">90s</button>
-              <button onClick={() => startTimer(120)} className="bg-zinc-800 hover:bg-yellow-500 hover:text-black text-zinc-300 px-4 py-2.5 rounded-full text-xs font-black transition-all">120s</button>
+              <button onClick={() => startTimer(60)} className="bg-zinc-800 hover:bg-red-600 text-zinc-300 px-4 py-2.5 rounded-full text-xs font-black transition-all">60s</button>
+              <button onClick={() => startTimer(90)} className="bg-zinc-800 hover:bg-red-600 text-zinc-300 px-4 py-2.5 rounded-full text-xs font-black transition-all">90s</button>
+              <button onClick={() => startTimer(120)} className="bg-zinc-800 hover:bg-red-600 text-zinc-300 px-4 py-2.5 rounded-full text-xs font-black transition-all">120s</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* 1RM ANALİZ MODALI */}
+      {/* 1RM ANALİZ MODALI - KIRMIZI VARYANT */}
       {isChartOpen && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[100] backdrop-blur-md">
           <div className="bg-zinc-900 border border-zinc-700 rounded-[2rem] p-8 w-full max-w-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)]">
             <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
               <div>
-                <h3 className="text-2xl font-black text-white italic">GÜÇ <span className="text-blue-500">EĞRİSİ</span></h3>
+                <h3 className="text-2xl font-black text-white italic">GÜÇ <span className="text-red-600">EĞRİSİ</span></h3>
                 <p className="text-xs text-zinc-400 font-bold tracking-widest uppercase">{activeExerciseForChart} 1RM Analizi</p>
               </div>
               <button onClick={() => setIsChartOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-3xl">×</button>
@@ -403,14 +409,14 @@ export default function WorkoutPage() {
                   <YAxis stroke="#71717a" tick={{fontSize: 12}} domain={['dataMin - 5', 'auto']} />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46', borderRadius: '10px' }}
-                    itemStyle={{ color: '#3b82f6', fontWeight: 'bold' }}
+                    itemStyle={{ color: '#dc2626', fontWeight: 'bold' }}
                   />
-                  <Line type="monotone" dataKey="oneRepMax" stroke="#3b82f6" strokeWidth={4} dot={{ r: 6, fill: "#3b82f6", stroke: "#18181b", strokeWidth: 2 }} activeDot={{ r: 8 }} />
+                  <Line type="monotone" dataKey="oneRepMax" stroke="#dc2626" strokeWidth={4} dot={{ r: 6, fill: "#dc2626", stroke: "#18181b", strokeWidth: 2 }} activeDot={{ r: 8 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
             <div className="mt-6 text-center">
-              <p className="text-[10px] text-zinc-500 italic">Vanguard algoritması verileri (Ağırlık x Tekrar) baz alarak hesaplamıştır.</p>
+              <p className="text-[10px] text-zinc-500 italic uppercase tracking-widest font-black">Bearguard algoritması verileri (Ağırlık x Tekrar) baz alarak hesaplamıştır.</p>
             </div>
           </div>
         </div>
