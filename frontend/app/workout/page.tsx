@@ -8,7 +8,7 @@ export default function WorkoutPage() {
   const router = useRouter();
   
   // --- SABİT API URL'Sİ (BEARGUARD GÜVENLİĞİ) ---
-  const API_BASE = "http://127.0.0.1:8000";
+  const API_BASE = "https://beartrack.onrender.com";
   
   // --- AUTH (TOKEN) DURUMU ---
   const [token, setToken] = useState<string | null>(null);
