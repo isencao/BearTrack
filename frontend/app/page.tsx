@@ -57,105 +57,105 @@ export default function Home() {
     : 0;
 
   return (
-    <main className="min-h-screen bg-black text-zinc-100 p-6 md:p-16 font-sans selection:bg-yellow-500 selection:text-black">
+    <main className="min-h-screen bg-black text-zinc-100 p-4 md:p-16 font-sans selection:bg-yellow-500 selection:text-black overflow-x-hidden">
       <div className="max-w-6xl mx-auto">
         
         {/* HEADER */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 border-b border-zinc-800/50 pb-8 gap-6">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 md:mb-16 border-b border-zinc-800/50 pb-6 md:pb-8 gap-4 md:gap-6">
           <div>
-            <h2 className="text-[10px] text-zinc-500 font-black tracking-[0.3em] mb-2 uppercase text-shadow-sm">Bearguard Fitness System</h2>
-            <h1 className="text-5xl md:text-7xl font-black italic tracking-tighter text-white">
+            <h2 className="text-[10px] text-zinc-500 font-black tracking-[0.3em] mb-1 md:mb-2 uppercase text-shadow-sm">Bearguard Fitness System</h2>
+            <h1 className="text-4xl md:text-7xl font-black italic tracking-tighter text-white">
               BEAR<span className="text-yellow-500">OS</span>
             </h1>
           </div>
           
-          <div className={`flex items-center gap-3 bg-zinc-900/80 border ${isConnected ? 'border-yellow-500/30' : 'border-zinc-800'} px-5 py-3 rounded-xl shadow-inner select-none transition-all`}>
+          <div className={`flex items-center gap-3 bg-zinc-900/80 border ${isConnected ? 'border-yellow-500/30' : 'border-zinc-800'} px-4 py-2 md:px-5 md:py-3 rounded-xl shadow-inner select-none transition-all`}>
             <div className="relative flex items-center justify-center">
-              <div className={`w-2.5 h-2.5 ${isConnected ? 'bg-yellow-500 animate-pulse' : 'bg-zinc-600'} rounded-full`}></div>
+              <div className={`w-2 h-2 md:w-2.5 md:h-2.5 ${isConnected ? 'bg-yellow-500 animate-pulse' : 'bg-zinc-600'} rounded-full`}></div>
             </div>
             <div className="flex flex-col">
-              <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest leading-none mb-0.5">
+              <span className="text-[8px] md:text-[9px] text-zinc-500 font-black uppercase tracking-widest leading-none mb-0.5">
                 {isConnected ? 'BAĞLANTI AKTİF' : 'BAĞLANTI YOK'}
               </span>
-              <span className={`text-sm font-black uppercase tracking-widest ${isConnected ? 'text-white' : 'text-zinc-600'}`}>
+              <span className={`text-xs md:text-sm font-black uppercase tracking-widest ${isConnected ? 'text-white' : 'text-zinc-600'}`}>
                 {isConnected ? `PROFİL: ${username}` : 'GİRİŞ BEKLENİYOR'}
               </span>
             </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           
           {/* BEARTRACK (BESLENME) KARTI */}
           <Link href="/nutrition" className="md:col-span-2 group">
-            <div className="h-full bg-zinc-900/30 border border-zinc-800 rounded-[2.5rem] p-10 md:p-12 transition-all duration-500 hover:bg-zinc-900/60 hover:border-yellow-500/30 hover:shadow-[0_0_50px_rgba(234,179,8,0.1)] relative overflow-hidden">
-              <div className="absolute -right-10 -bottom-10 opacity-5 group-hover:opacity-10 transition-opacity duration-500 text-[15rem] leading-none pointer-events-none">🍽️</div>
-              <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white mb-3">
+            <div className="h-full bg-zinc-900/30 border border-zinc-800 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-12 transition-all duration-500 hover:bg-zinc-900/60 hover:border-yellow-500/30 hover:shadow-[0_0_50px_rgba(234,179,8,0.1)] relative overflow-hidden">
+              <div className="absolute -right-4 -bottom-4 md:-right-10 md:-bottom-10 opacity-5 group-hover:opacity-10 transition-opacity duration-500 text-8xl md:text-[15rem] leading-none pointer-events-none">🍽️</div>
+              <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white mb-2 md:mb-3">
                 BEAR<span className="text-yellow-500">TRACK</span>
               </h2>
-              <p className="text-sm md:text-base text-zinc-400 font-medium mb-12 max-w-md">
+              <p className="text-xs md:text-base text-zinc-400 font-medium mb-6 md:mb-12 max-w-md">
                 Yapay Zeka Destekli Beslenme, Kalori, Su ve Makro Takip Sistemi.
               </p>
-              <div className="inline-flex items-center gap-3 border border-yellow-500/20 text-yellow-500 bg-yellow-500/5 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest group-hover:bg-yellow-500 group-hover:text-black transition-all">
-                MUTFAĞA GİR <span className="text-lg">→</span>
+              <div className="inline-flex items-center gap-2 md:gap-3 border border-yellow-500/20 text-yellow-500 bg-yellow-500/5 px-4 py-2 md:px-6 md:py-3 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest group-hover:bg-yellow-500 group-hover:text-black transition-all">
+                MUTFAĞA GİR <span className="text-sm md:text-lg">→</span>
               </div>
             </div>
           </Link>
 
           {/* VÜCUT PROFİLİ KARTI */}
-          <div className="md:col-span-1 bg-zinc-900/30 border border-zinc-800 rounded-[2.5rem] p-8 relative overflow-hidden">
-            <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-8 flex items-center gap-2">
+          <div className="md:col-span-1 bg-zinc-900/30 border border-zinc-800 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-8 relative overflow-hidden">
+            <h3 className="text-[10px] md:text-xs font-black text-zinc-500 uppercase tracking-widest mb-6 md:mb-8 flex items-center gap-2">
               <span>📊</span> VÜCUT PROFİLİ
             </h3>
             
             {isConnected && profileData?.weight ? (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center border-b border-zinc-800/50 pb-4">
-                  <span className="text-sm font-bold text-zinc-400">Ana Hedef</span>
-                  <span className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest">{displayGoal}</span>
+              <div className="space-y-4 md:space-y-6">
+                <div className="flex justify-between items-center border-b border-zinc-800/50 pb-3 md:pb-4">
+                  <span className="text-xs md:text-sm font-bold text-zinc-400">Ana Hedef</span>
+                  <span className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-2 py-1 md:px-3 rounded-md text-[9px] md:text-[10px] font-black uppercase tracking-widest">{displayGoal}</span>
                 </div>
-                <div className="flex justify-between items-center border-b border-zinc-800/50 pb-4">
-                  <span className="text-sm font-bold text-zinc-400">Güncel Kilo</span>
-                  <span className="text-white font-black">{profileData.weight} <span className="text-zinc-500 text-xs">KG</span></span>
+                <div className="flex justify-between items-center border-b border-zinc-800/50 pb-3 md:pb-4">
+                  <span className="text-xs md:text-sm font-bold text-zinc-400">Güncel Kilo</span>
+                  <span className="text-white font-black text-sm md:text-base">{profileData.weight} <span className="text-zinc-500 text-[10px] md:text-xs">KG</span></span>
                 </div>
-                <div className="flex justify-between items-center border-b border-zinc-800/50 pb-4">
-                  <span className="text-sm font-bold text-zinc-400">Metabolizma (BMR)</span>
-                  <span className="text-yellow-500 font-black">{bmr} <span className="text-zinc-500 text-xs">KCAL</span></span>
+                <div className="flex justify-between items-center border-b border-zinc-800/50 pb-3 md:pb-4">
+                  <span className="text-xs md:text-sm font-bold text-zinc-400">Metabolizma (BMR)</span>
+                  <span className="text-yellow-500 font-black text-sm md:text-base">{bmr} <span className="text-zinc-500 text-[10px] md:text-xs">KCAL</span></span>
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-40 text-center opacity-50">
-                <span className="text-3xl mb-3">⚖️</span>
-                <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest leading-relaxed">Sistem Kalibrasyonu<br/>Bekleniyor</p>
+              <div className="flex flex-col items-center justify-center h-32 md:h-40 text-center opacity-50">
+                <span className="text-2xl md:text-3xl mb-2 md:mb-3">⚖️</span>
+                <p className="text-[10px] md:text-xs text-zinc-400 font-bold uppercase tracking-widest leading-relaxed">Sistem Kalibrasyonu<br/>Bekleniyor</p>
               </div>
             )}
             
-            <div className="absolute bottom-6 right-8 text-[8px] font-black tracking-widest text-zinc-600 uppercase">
+            <div className="absolute bottom-4 right-4 md:bottom-6 md:right-8 text-[7px] md:text-[8px] font-black tracking-widest text-zinc-600 uppercase">
               BEARGUARD V5.0
             </div>
           </div>
 
           {/* HESAP MERKEZİ */}
-          <div className="md:col-span-1 bg-zinc-900/30 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-center group transition-all hover:border-zinc-700 relative overflow-hidden">
+          <div className="md:col-span-1 bg-zinc-900/30 border border-zinc-800 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-8 flex flex-col items-center justify-center text-center group transition-all hover:border-zinc-700 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-t from-red-900/5 to-transparent opacity-0 group-hover:opacity-100 transition-all"></div>
             
-            <div className="w-16 h-16 bg-zinc-950 border border-zinc-800 rounded-full flex items-center justify-center mb-5 shadow-inner relative z-10">
-              <span className="text-2xl">{isConnected ? '👤' : '🔒'}</span>
+            <div className="w-12 h-12 md:w-16 md:h-16 bg-zinc-950 border border-zinc-800 rounded-full flex items-center justify-center mb-4 md:mb-5 shadow-inner relative z-10">
+              <span className="text-xl md:text-2xl">{isConnected ? '👤' : '🔒'}</span>
             </div>
             
-            <h3 className="text-sm font-black text-white uppercase tracking-widest mb-2 relative z-10">
+            <h3 className="text-xs md:text-sm font-black text-white uppercase tracking-widest mb-1 md:mb-2 relative z-10">
               HESAP MERKEZİ
             </h3>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-6 relative z-10">
+            <p className="text-[9px] md:text-[10px] text-zinc-500 uppercase tracking-widest mb-4 md:mb-6 relative z-10">
               {isConnected ? `Bağlı Hesap: ${username}` : 'KİMLİK DOĞRULANMADI'}
             </p>
             
             {isConnected ? (
-              <button onClick={handleLockSystem} className="relative z-10 text-xs font-black bg-zinc-800/50 text-red-500 border border-red-500/20 px-6 py-3 rounded-xl hover:bg-red-600 hover:text-white transition-all w-full tracking-[0.2em] uppercase">
+              <button onClick={handleLockSystem} className="relative z-10 text-[10px] md:text-xs font-black bg-zinc-800/50 text-red-500 border border-red-500/20 px-4 py-2 md:px-6 md:py-3 rounded-xl hover:bg-red-600 hover:text-white transition-all w-full tracking-[0.2em] uppercase">
                 GÜVENLİ ÇIKIŞ YAP
               </button>
             ) : (
-              <Link href="/nutrition" className="relative z-10 text-xs font-black bg-zinc-800 text-zinc-400 border border-zinc-700 px-6 py-3 rounded-xl hover:bg-yellow-500 hover:text-black hover:border-yellow-500 transition-all w-full tracking-[0.2em] uppercase block">
+              <Link href="/nutrition" className="relative z-10 text-[10px] md:text-xs font-black bg-zinc-800 text-zinc-400 border border-zinc-700 px-4 py-2 md:px-6 md:py-3 rounded-xl hover:bg-yellow-500 hover:text-black hover:border-yellow-500 transition-all w-full tracking-[0.2em] uppercase block">
                 SİSTEME GİRİŞ YAP
               </Link>
             )}
@@ -163,21 +163,21 @@ export default function Home() {
 
           {/* BEARIRON (ANTRENMAN) KARTI */}
           <Link href="/workout" className="md:col-span-2 group">
-            <div className="h-full bg-zinc-900/30 border border-zinc-800 rounded-[2.5rem] p-10 md:p-12 transition-all duration-500 hover:bg-zinc-900/60 hover:border-red-600/30 hover:shadow-[0_0_50px_rgba(220,38,38,0.1)] relative overflow-hidden">
-              <div className="absolute -right-10 -bottom-10 opacity-5 group-hover:opacity-10 transition-opacity duration-500 text-[15rem] leading-none pointer-events-none">🏋️‍♂️</div>
-              <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white mb-3">
+            <div className="h-full bg-zinc-900/30 border border-zinc-800 rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-12 transition-all duration-500 hover:bg-zinc-900/60 hover:border-red-600/30 hover:shadow-[0_0_50px_rgba(220,38,38,0.1)] relative overflow-hidden">
+              <div className="absolute -right-4 -bottom-4 md:-right-10 md:-bottom-10 opacity-5 group-hover:opacity-10 transition-opacity duration-500 text-8xl md:text-[15rem] leading-none pointer-events-none">🏋️‍♂️</div>
+              <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white mb-2 md:mb-3">
                 BEAR<span className="text-red-600">IRON</span>
               </h2>
-              <p className="text-sm md:text-base text-zinc-400 font-medium mb-12 max-w-md">
+              <p className="text-xs md:text-base text-zinc-400 font-medium mb-6 md:mb-12 max-w-md">
                 Kapsamlı İdman Takibi, Hayalet Setler ve Akıllı Şablonlar.
               </p>
-              <div className="mb-6">
-                <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest italic">
+              <div className="mb-4 md:mb-6">
+                <p className="text-[9px] md:text-[10px] font-black text-zinc-600 uppercase tracking-widest italic">
                   "Bahane yok, sadece saf güç ve disiplin."
                 </p>
               </div>
-              <div className="inline-flex items-center gap-3 border border-red-600/20 text-red-600 bg-red-600/5 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest group-hover:bg-red-600 group-hover:text-white transition-all">
-                SAHAYA İN <span className="text-lg">→</span>
+              <div className="inline-flex items-center gap-2 md:gap-3 border border-red-600/20 text-red-600 bg-red-600/5 px-4 py-2 md:px-6 md:py-3 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest group-hover:bg-red-600 group-hover:text-white transition-all">
+                SAHAYA İN <span className="text-sm md:text-lg">→</span>
               </div>
             </div>
           </Link>
