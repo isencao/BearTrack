@@ -46,23 +46,36 @@ Projeyi kendi bilgisayarınızda çalıştırmak için aşağıdaki adımları i
 ```bash
 git clone [https://github.com/isencao/BearTrack.git](https://github.com/isencao/BearTrack.git)
 cd BearTrack
+```
 
 ### 2. Backend Kurulumu
-```
+```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # Windows için: venv\Scripts\activate
+# Windows için: venv\Scripts\activate
+# macOS/Linux için: source venv/bin/activate
 pip install -r requirements.txt
-
+```
 Backend dizininde bir .env dosyası oluşturun ve gerekli ortam değişkenlerini (DATABASE_URL, SECRET_KEY, GROQ_API_KEY) ekleyin. Ardından sunucuyu başlatın:
 ```
 uvicorn main:app --reload
+```
 
 ### 3. Frontend Kurulumu
-```
-cd frontend
+```bash
+cd ../frontend
 npm install
 npm run dev
+```
+
+
+
+
+
+
+
+
+
 
 
 
