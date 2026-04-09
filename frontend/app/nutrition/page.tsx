@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link"; 
+import { useRouter } from "next/navigation";
 
 export default function NutritionPage() {
+  const router = useRouter();
   const API_BASE = "http://127.0.0.1:8000";
 
   // --- AUTH (GÜVENLİK) STATE'LERİ ---
@@ -122,6 +124,9 @@ export default function NutritionPage() {
       localStorage.setItem("bearToken", data.access_token);
       setToken(data.access_token);
       setIsAuthModalOpen(false);
+      
+      // GİRİŞ BAŞARILIYSA ANA SAYFAYA (BEAR OS) YÖNLENDİR
+      router.push("/");
     } catch (err: any) {
       setAuthError(err.message);
     } finally {
@@ -163,7 +168,7 @@ export default function NutritionPage() {
       if (res.ok) {
         const data = await res.json();
         
-        // KULLANICI ADINI KAYDET (Yeni eklendi)
+        // KULLANICI ADINI KAYDET
         if (data.username) {
           setUsername(data.username);
         }
@@ -582,11 +587,10 @@ export default function NutritionPage() {
                   <span className={`w-1.5 h-8 ${isCalOver ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'} rounded-full`}></span>
                   {selectedDate.toDateString() === new Date().toDateString() ? "Günlük Alınan Besin Değerleri" : `${selectedDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} Özeti`}
                 </h2>
-                {selectedDate.toDateString() === new Date().toDateString() && (
-                  <button onClick={() => setIsModalOpen(true)} className="bg-yellow-500 hover:bg-yellow-400 text-black font-black py-3 px-6 rounded-2xl transition-all active:scale-95 shadow-[0_0_20px_rgba(234,179,8,0.3)] text-sm">
-                    + ÖĞÜN EKLE
-                  </button>
-                )}
+                {/* Butonu her gün için görünür kıldık */}
+                <button onClick={() => setIsModalOpen(true)} className="bg-yellow-500 hover:bg-yellow-400 text-black font-black py-3 px-6 rounded-2xl transition-all active:scale-95 shadow-[0_0_20px_rgba(234,179,8,0.3)] text-sm">
+                  + ÖĞÜN EKLE
+                </button>
               </div>
 
               <div className="grid gap-8 md:grid-cols-2">

@@ -1,89 +1,187 @@
+"use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-export default function HubPage() {
+export default function Home() {
+  const router = useRouter();
+  const [username, setUsername] = useState<string>("");
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [profileData, setProfileData] = useState<any>(null);
+
+  useEffect(() => {
+    // Component yüklendiğinde token ve kullanıcı adını kontrol et
+    const token = localStorage.getItem("bearToken");
+    if (token) {
+      setIsConnected(true);
+      fetchUserData(token);
+    }
+  }, []);
+
+  const fetchUserData = async (token: string) => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/profile", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.username) setUsername(data.username);
+        // Tüm profil verisini (kilo, boy, hedef) state'e atıyoruz
+        setProfileData(data); 
+      }
+    } catch (err) {
+      console.warn("Ana sayfada kullanıcı verisi çekilemedi.");
+    }
+  };
+
+  const handleLockSystem = () => {
+    // Çıkış yap
+    localStorage.removeItem("bearToken");
+    localStorage.removeItem("bearProfile");
+    localStorage.removeItem("bearTemplates");
+    setIsConnected(false);
+    setUsername("");
+    setProfileData(null);
+    window.location.reload();
+  };
+
+  // Hedefleri Türkçeye Çevirme
+  const goalMap: Record<string, string> = { 
+    cut: "DEFİNASYON", 
+    bulk: "BÜYÜME (BULK)", 
+    maintain: "KORUMA" 
+  };
+  const displayGoal = profileData?.goal ? goalMap[profileData.goal] : "BELİRSİZ";
+
+  // Bazal Metabolizma (BMR) Hesaplama
+  const bmr = profileData?.weight && profileData?.height && profileData?.age
+    ? Math.round(10 * profileData.weight + 6.25 * profileData.height - 5 * profileData.age + 5)
+    : 0;
+
   return (
-    <main className="min-h-screen bg-black text-zinc-100 flex flex-col items-center justify-center p-4 md:p-12 selection:bg-yellow-500 selection:text-black relative overflow-hidden">
-      {/* Arka plan efekti */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-yellow-500/10 blur-[120px] rounded-full pointer-events-none"></div>
-
-      <div className="w-full max-w-5xl relative z-10 animate-fade-in">
+    <main className="min-h-screen bg-black text-zinc-100 p-6 md:p-16 font-sans selection:bg-yellow-500 selection:text-black">
+      <div className="max-w-6xl mx-auto">
+        
         {/* HEADER */}
-        <div className="mb-10 border-b border-zinc-800 pb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 border-b border-zinc-800/50 pb-8 gap-6">
           <div>
-            {/* Vanguard -> Bearguard */}
-            <h1 className="text-[10px] md:text-xs font-black text-zinc-500 tracking-[0.5em] mb-2 uppercase">Bearguard Security Protocol</h1>
-            <h2 className="text-5xl md:text-7xl font-black italic tracking-tighter text-white">BEAR<span className="text-yellow-500">OS</span></h2>
+            <h2 className="text-[10px] text-zinc-500 font-black tracking-[0.3em] mb-2 uppercase">Bearguard Fitness System</h2>
+            <h1 className="text-5xl md:text-7xl font-black italic tracking-tighter text-white">
+              BEAR<span className="text-yellow-500">OS</span>
+            </h1>
           </div>
-          <div className="flex items-center gap-3 bg-zinc-900/50 border border-zinc-800 px-4 py-2.5 rounded-2xl backdrop-blur-md">
-            <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
-            <span className="text-[10px] font-black text-zinc-300 tracking-[0.2em] uppercase">Sistem Çevrimiçi</span>
+          
+          {/* AKTİF KULLANICI ROZETİ */}
+          <div className={`flex items-center gap-3 bg-zinc-900/80 border ${isConnected ? 'border-zinc-700' : 'border-zinc-800'} px-5 py-3 rounded-xl shadow-inner select-none transition-all`}>
+            <div className="relative flex items-center justify-center">
+              <div className={`w-2.5 h-2.5 ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-zinc-600'} rounded-full`}></div>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest leading-none mb-0.5">
+                {isConnected ? 'BAĞLANTI AKTİF' : 'BAĞLANTI YOK'}
+              </span>
+              <span className={`text-sm font-black uppercase tracking-widest ${isConnected ? 'text-white' : 'text-zinc-600'}`}>
+                {isConnected ? `PROFİL: ${username}` : 'GİRİŞ BEKLENİYOR'}
+              </span>
+            </div>
           </div>
-        </div>
+        </header>
 
-        {/* GRID MİMARİSİ (KUMANDA MERKEZİ) */}
+        {/* BÜYÜK GRID YAPISI */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* BEARTRACK KARTI */}
-          <Link href="/nutrition" className="group md:col-span-2 bg-zinc-900/40 border border-zinc-800 rounded-[2rem] p-8 hover:border-yellow-500/50 transition-all duration-300 hover:bg-zinc-900/80 hover:shadow-[0_0_40px_rgba(234,179,8,0.1)] relative overflow-hidden flex flex-col justify-between min-h-[280px]">
-            <div className="absolute -right-5 -bottom-5 text-9xl opacity-5 group-hover:opacity-10 transition-transform duration-500 group-hover:scale-110">🍽️</div>
-            <div>
-              <h3 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white mb-3">BEAR<span className="text-yellow-500">TRACK</span></h3>
-              <p className="text-zinc-400 text-sm font-medium max-w-[80%] leading-relaxed">Yapay Zeka Destekli Beslenme, Kalori, Su ve Makro Takip Sistemi.</p>
-            </div>
-            <div className="text-yellow-500 font-black text-xs uppercase tracking-[0.3em] flex items-center gap-3 mt-8 bg-black/50 w-fit px-5 py-3 rounded-xl border border-yellow-500/20 group-hover:border-yellow-500 transition-colors">
-              MUTFAĞA GİR <span className="group-hover:translate-x-2 transition-transform text-lg">→</span>
+          {/* BEARTRACK (BESLENME) KARTI */}
+          <Link href="/nutrition" className="md:col-span-2 group">
+            <div className="h-full bg-zinc-900/30 border border-zinc-800 rounded-[2.5rem] p-10 md:p-12 transition-all duration-500 hover:bg-zinc-900/60 hover:border-yellow-500/30 hover:shadow-[0_0_50px_rgba(234,179,8,0.1)] relative overflow-hidden">
+              <div className="absolute -right-10 -bottom-10 opacity-5 group-hover:opacity-10 transition-opacity duration-500 text-[15rem] leading-none pointer-events-none">🍽️</div>
+              <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white mb-3">
+                BEAR<span className="text-yellow-500">TRACK</span>
+              </h2>
+              <p className="text-sm md:text-base text-zinc-400 font-medium mb-12 max-w-md">
+                Yapay Zeka Destekli Beslenme, Kalori, Su ve Makro Takip Sistemi.
+              </p>
+              <div className="inline-flex items-center gap-3 border border-yellow-500/20 text-yellow-500 bg-yellow-500/5 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest group-hover:bg-yellow-500 group-hover:text-black transition-all">
+                MUTFAĞA GİR <span className="text-lg">→</span>
+              </div>
             </div>
           </Link>
 
-          {/* SİSTEM BİLGİ KARTI */}
-          <div className="bg-zinc-900/20 border border-zinc-800/50 rounded-[2rem] p-8 flex flex-col justify-between min-h-[280px]">
-            <div>
-              <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-6 flex items-center gap-2">
-                <span className="text-lg">⚙️</span> ÇEKİRDEK DURUMU
-              </h4>
-              <div className="space-y-5">
-                <div className="flex justify-between items-center border-b border-zinc-800/50 pb-3">
-                  <span className="text-xs text-zinc-400 font-bold">Veritabanı</span>
-                  <span className="text-xs text-green-500 font-black tracking-widest bg-green-500/10 px-2 py-1 rounded-md">AKTİF</span>
+          {/* VÜCUT PROFİLİ KARTI (YENİ EKLENDİ) */}
+          <div className="md:col-span-1 bg-zinc-900/30 border border-zinc-800 rounded-[2.5rem] p-8 relative overflow-hidden">
+            <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-8 flex items-center gap-2">
+              <span>📊</span> VÜCUT PROFİLİ
+            </h3>
+            
+            {isConnected && profileData?.weight ? (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center border-b border-zinc-800/50 pb-4">
+                  <span className="text-sm font-bold text-zinc-400">Ana Hedef</span>
+                  <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest">{displayGoal}</span>
                 </div>
-                <div className="flex justify-between items-center border-b border-zinc-800/50 pb-3">
-                  <span className="text-xs text-zinc-400 font-bold">AI (LLaMA 3.3)</span>
-                  <span className="text-xs text-green-500 font-black tracking-widest bg-green-500/10 px-2 py-1 rounded-md">BAĞLI</span>
+                <div className="flex justify-between items-center border-b border-zinc-800/50 pb-4">
+                  <span className="text-sm font-bold text-zinc-400">Güncel Kilo</span>
+                  <span className="text-white font-black">{profileData.weight} <span className="text-zinc-500 text-xs">KG</span></span>
                 </div>
-                <div className="flex justify-between items-center border-b border-zinc-800/50 pb-3">
-                  <span className="text-xs text-zinc-400 font-bold">Ghost Protocol</span>
-                  <span className="text-xs text-yellow-500 font-black tracking-widest bg-yellow-500/10 px-2 py-1 rounded-md">HAZIR</span>
+                <div className="flex justify-between items-center border-b border-zinc-800/50 pb-4">
+                  <span className="text-sm font-bold text-zinc-400">Metabolizma (BMR)</span>
+                  <span className="text-yellow-500 font-black">{bmr} <span className="text-zinc-500 text-xs">KCAL</span></span>
                 </div>
               </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-40 text-center opacity-50">
+                <span className="text-3xl mb-3">⚖️</span>
+                <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest">Sistem Kalibrasyonu Bekleniyor</p>
+              </div>
+            )}
+            
+            <div className="absolute bottom-6 right-8 text-[8px] font-black tracking-widest text-zinc-600 uppercase">
+              BEARGUARD V5.0
             </div>
-            {/* Ursusguard -> Bearguard */}
-            <p className="text-[9px] text-zinc-600 mt-4 uppercase tracking-[0.2em] text-right font-black">BEARGUARD V5.0</p>
           </div>
 
-          {/* KUMANDA MERKEZİ İKON KARTI */}
-          <div className="bg-zinc-900/20 border border-zinc-800/50 rounded-[2rem] p-8 flex flex-col justify-center items-center text-center min-h-[280px] group hover:border-zinc-700 transition-all cursor-default relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-zinc-900/50 pointer-events-none"></div>
-            <div className="w-20 h-20 bg-black border-2 border-zinc-800 rounded-full flex items-center justify-center mb-5 text-3xl group-hover:scale-110 group-hover:border-zinc-600 transition-all z-10 shadow-xl">
-              🐻
-            </div>
-            <h4 className="text-sm font-black text-white mb-2 tracking-widest z-10">KUMANDA MERKEZİ</h4>
-            <p className="text-[11px] text-zinc-500 font-medium px-2 z-10">Modüller arası geçiş yapmak için operasyon panellerini kullanın.</p>
-          </div>
-
-          {/* BEARIRON KARTI */}
-          <Link href="/workout" className="group md:col-span-2 bg-zinc-900/40 border border-zinc-800 rounded-[2rem] p-8 hover:border-red-500/50 transition-all duration-300 hover:bg-zinc-900/80 hover:shadow-[0_0_40px_rgba(239,68,68,0.1)] relative overflow-hidden flex flex-col justify-between min-h-[280px]">
-            <div className="absolute -right-5 -bottom-5 text-9xl opacity-5 group-hover:opacity-10 transition-transform duration-500 group-hover:scale-110">🏋️</div>
-            <div>
-              <h3 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white mb-3">BEAR<span className="text-red-500">IRON</span></h3>
-              <p className="text-zinc-400 text-sm font-medium max-w-[80%] leading-relaxed">Kinetic Sessions, Shadow Reps ve Flex Blueprints.</p>
+          {/* HESAP MERKEZİ */}
+          <div className="md:col-span-1 bg-zinc-900/30 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-center group transition-all hover:border-zinc-700 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-t from-red-900/5 to-transparent opacity-0 group-hover:opacity-100 transition-all"></div>
+            
+            <div className="w-16 h-16 bg-zinc-950 border border-zinc-800 rounded-full flex items-center justify-center mb-5 shadow-inner relative z-10">
+              <span className="text-2xl">{isConnected ? '👤' : '🔒'}</span>
             </div>
             
-            <div className="mt-4">
-              <p className="text-[9px] text-zinc-600 uppercase font-black tracking-[0.3em] italic mb-6 group-hover:text-zinc-500 transition-colors">
-                "Hardcore logic for hardcore gains."
+            <h3 className="text-sm font-black text-white uppercase tracking-widest mb-2 relative z-10">
+              HESAP MERKEZİ
+            </h3>
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-6 relative z-10">
+              {isConnected ? `Bağlı Hesap: ${username}` : 'KİMLİK DOĞRULANMADI'}
+            </p>
+            
+            {isConnected ? (
+              <button onClick={handleLockSystem} className="relative z-10 text-xs font-black bg-zinc-800/50 text-red-500 border border-red-500/20 px-6 py-3 rounded-xl hover:bg-red-500 hover:text-white transition-all w-full tracking-[0.2em] uppercase">
+                GÜVENLİ ÇIKIŞ YAP
+              </button>
+            ) : (
+              <Link href="/nutrition" className="relative z-10 text-xs font-black bg-zinc-800 text-zinc-400 border border-zinc-700 px-6 py-3 rounded-xl hover:bg-yellow-500 hover:text-black hover:border-yellow-500 transition-all w-full tracking-[0.2em] uppercase block">
+                SİSTEME GİRİŞ YAP
+              </Link>
+            )}
+          </div>
+
+          {/* BEARIRON (ANTRENMAN) KARTI */}
+          <Link href="/workout" className="md:col-span-2 group">
+            <div className="h-full bg-zinc-900/30 border border-zinc-800 rounded-[2.5rem] p-10 md:p-12 transition-all duration-500 hover:bg-zinc-900/60 hover:border-red-600/30 hover:shadow-[0_0_50px_rgba(220,38,38,0.1)] relative overflow-hidden">
+              <div className="absolute -right-10 -bottom-10 opacity-5 group-hover:opacity-10 transition-opacity duration-500 text-[15rem] leading-none pointer-events-none">🏋️‍♂️</div>
+              <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white mb-3">
+                BEAR<span className="text-red-600">IRON</span>
+              </h2>
+              <p className="text-sm md:text-base text-zinc-400 font-medium mb-12 max-w-md">
+                Kapsamlı İdman Takibi, Dinamik Setler ve Akıllı Şablonlar.
               </p>
-              <div className="text-red-500 font-black text-xs uppercase tracking-[0.3em] flex items-center gap-3 bg-black/50 w-fit px-5 py-3 rounded-xl border border-red-500/20 group-hover:border-red-500 transition-colors">
-                SAHAYA İN <span className="group-hover:translate-x-2 transition-transform text-lg">→</span>
+              <div className="mb-6">
+                <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest italic">
+                  "Hardcore logic for hardcore gains."
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-3 border border-red-600/20 text-red-600 bg-red-600/5 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest group-hover:bg-red-600 group-hover:text-white transition-all">
+                SAHAYA İN <span className="text-lg">→</span>
               </div>
             </div>
           </Link>
