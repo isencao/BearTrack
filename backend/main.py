@@ -222,5 +222,5 @@ def update_profile(data: ProfileUpdate, session: Session = Depends(get_session),
 
 @app.get("/api/profile")
 def get_profile(current_user: models.User = Depends(get_current_user)):
-    # Sadece giriş yapan kullanıcının kendi kalibrasyon verilerini döndürür
+
     return current_user

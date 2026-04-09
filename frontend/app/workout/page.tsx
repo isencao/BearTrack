@@ -27,9 +27,11 @@ export default function WorkoutPage() {
   const [workoutName, setWorkoutName] = useState("");
   const [duration, setDuration] = useState(60); 
   const [intensity, setIntensity] = useState(5.0); 
-  const [userWeight, setUserWeight] = useState(103); 
+  const [userWeight, setUserWeight] = useState<number>(0);
+  const [username, setUsername] = useState<string>("OPERATÖR");
   const [burnedCalories, setBurnedCalories] = useState(0); 
   const [isLoading, setIsLoading] = useState(false);
+  
   
   // ŞABLONLAR
   const [templates, setTemplates] = useState<{name: string, exercises: any[]}[]>([]);
@@ -63,24 +65,66 @@ export default function WorkoutPage() {
   const stopTimer = () => { setIsTimerActive(false); setTimer(0); };
   const formatTime = (ts: number) => `${Math.floor(ts / 60).toString().padStart(2, '0')}:${(ts % 60).toString().padStart(2, '0')}`;
 
-  // --- PROFİL VE KALORİ HESAPLAMA ---
+  // --- BAŞLANGIÇ VERİLERİNİ ÇEKME (KİLO, İSİM & ŞABLONLAR) ---
   useEffect(() => {
-    const savedProfile = localStorage.getItem("bearProfile");
-    if (savedProfile) setUserWeight(JSON.parse(savedProfile).weight);
-    
+    // 1. Şablonları Yükle
     const savedTemplates = localStorage.getItem("bearTemplates");
     if (savedTemplates) setTemplates(JSON.parse(savedTemplates));
+
+    // 2. Performans için önce LocalStorage'dan kiloyu al
+    const savedProfile = localStorage.getItem("bearProfile");
+    if (savedProfile) setUserWeight(JSON.parse(savedProfile).weight);
+
+    // 3. Sonra veritabanından en güncel bilgileri çek
+    const fetchUserData = async () => {
+      const token = localStorage.getItem("bearToken");
+      if (!token) return;
+
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/profile", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Hem ismi hem de kiloyu güncelliyoruz
+          if (data.username) {
+            setUsername(data.username);
+          }
+          if (data.weight) {
+            setUserWeight(data.weight);
+          }
+        }
+      } catch (err) {
+        console.error("Kullanıcı bilgisi çekilemedi", err);
+      }
+    };
+
+    fetchUserData();
   }, []);
 
+  // --- DİNAMİK SÜRE VE KALORİ HESAPLAMA ---
   const totalSets = exercises.reduce((acc, ex) => acc + ex.sets.length, 0);
   
   useEffect(() => { 
     setDuration(Math.max(1, Math.round(totalSets * 2.5))); 
   }, [totalSets]); 
 
-  useEffect(() => { 
-    if (userWeight > 0) setBurnedCalories(Math.round(intensity * userWeight * (duration / 60))); 
-  }, [duration, intensity, userWeight]); 
+  // OTOMATİK KALORİ HESAPLAYICI
+  useEffect(() => {
+    // Kilo yoksa veya süre sıfırsa hesaplama yapma (NaN hatasını engeller)
+    if (!userWeight || !duration) {
+      setBurnedCalories(0);
+      return;
+    }
+
+    const weight = Number(userWeight);
+    const dur = Number(duration) / 60; // Dakikayı saate çevir
+    const met = Number(intensity);
+
+    const cal = met * weight * dur;
+    setBurnedCalories(Math.round(cal));
+  }, [userWeight, duration, intensity]);
+
 
   const getLocalISODate = (date: Date) => {
     const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0');
@@ -221,15 +265,29 @@ export default function WorkoutPage() {
       <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
         
         {/* HEADER */}
-        <header className="flex justify-between items-center pb-4">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-zinc-800/50 mb-6 gap-4">
           <Link href="/">
             <h1 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white hover:text-red-600 transition-all cursor-pointer">
               BEAR<span className="text-red-600">IRON</span>
             </h1>
           </Link>
-          <Link href="/nutrition" className="bg-zinc-900 border border-zinc-800 hover:border-red-600 text-zinc-400 py-2 px-4 rounded-xl transition-all text-xs font-black uppercase tracking-widest">
-            🍽️ BESLENME
-          </Link>
+          
+          <div className="flex items-center gap-4">
+            {/* HOŞ GELDİN ROZETİ */}
+            <div className="flex items-center gap-3 bg-zinc-900/80 border border-zinc-800 px-4 py-2 rounded-xl shadow-inner select-none">
+              <div className="relative flex items-center justify-center">
+                <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest leading-none mb-0.5">SİSTEME GİRİŞ YAPILDI</span>
+                <span className="text-xs text-white font-black uppercase tracking-widest">HOŞ GELDİN, <span className="text-red-600">{username}</span></span>
+              </div>
+            </div>
+
+            <Link href="/nutrition" className="bg-zinc-900 border border-zinc-800 hover:border-red-600 text-zinc-400 py-3 px-4 rounded-xl transition-all text-xs font-black uppercase tracking-widest h-full flex items-center">
+              🍽️ BESLENME
+            </Link>
+          </div>
         </header>
 
         {/* ŞABLON ŞERİDİ */}
@@ -283,7 +341,7 @@ export default function WorkoutPage() {
 
         <div className="flex justify-end">
            <span className="bg-zinc-900 border border-zinc-800 px-4 py-1.5 rounded-full text-xs font-black text-zinc-500 tracking-widest uppercase shadow-md">
-             TOPLAM SET: <span className="text-red-600">{totalSets}</span>
+              TOPLAM SET: <span className="text-red-600">{totalSets}</span>
            </span>
         </div>
 

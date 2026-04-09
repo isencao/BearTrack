@@ -28,6 +28,9 @@ export default function NutritionPage() {
   const [reportData, setReportData] = useState<any>(null);
   const [isReportLoading, setIsReportLoading] = useState(false);
 
+  // KULLANICI ADI STATE'İ (YENİ EKLENDİ)
+  const [username, setUsername] = useState<string>("OPERATÖR");
+
   const [profile, setProfile] = useState({
     weight: 103, height: 183, age: 23, activity: 1.55, goal: "cut" 
   });
@@ -127,13 +130,24 @@ export default function NutritionPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("bearToken");
-    setToken(null);
-    setFoods([]);
-    setAuthUsername("");
-    setAuthPassword("");
-    setIsAuthModalOpen(true);
-  };
+  // 1. Tüm Bearguard tarayıcı kalıntılarını sil!
+  localStorage.removeItem("bearToken");
+  localStorage.removeItem("bearProfile"); 
+  localStorage.removeItem("bearTemplates"); 
+  
+  // 2. State'leri (Aktif Ekranı) Sıfırla
+  setToken(null);
+  setFoods([]);
+  setAuthUsername("");
+  setAuthPassword("");
+  
+  // Eğer nutrition sayfasındaysan profili de sıfırla
+  if (typeof setProfile === 'function') {
+    setProfile({ weight: 0, height: 0, age: 0, activity: 1.55, goal: "cut" });
+  }
+
+  setIsAuthModalOpen(true);
+};
 
   // ==========================================
   // API İŞLEMLERİ (TOKEN KORUMALI)
@@ -148,6 +162,12 @@ export default function NutritionPage() {
       const res = await fetch(`${API_BASE}/api/profile`, { headers: authHeaders });
       if (res.ok) {
         const data = await res.json();
+        
+        // KULLANICI ADINI KAYDET (Yeni eklendi)
+        if (data.username) {
+          setUsername(data.username);
+        }
+
         if (data.weight) {
           setProfile({
             weight: data.weight,
@@ -471,8 +491,8 @@ export default function NutritionPage() {
     <main className="min-h-screen bg-black text-zinc-100 p-6 md:p-12 font-sans selection:bg-yellow-500 selection:text-black">
       <div className="max-w-5xl mx-auto print:hidden">
         
-        {/* HEADER */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-zinc-800 pb-8">
+        {/* HEADER (YENİ ROZET TASARIMIYLA GÜNCELLENDİ) */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-zinc-800/50 mb-6 gap-4">
           <Link href="/">
             <div className="hover:opacity-80 transition-opacity cursor-pointer">
               <h1 className="text-5xl font-black italic tracking-tighter text-white">
@@ -481,8 +501,20 @@ export default function NutritionPage() {
               <p className="text-zinc-500 font-medium mt-1 uppercase tracking-widest text-xs">Bearguard Beslenme Sistemi</p>
             </div>
           </Link>
+          
           <div className="flex flex-wrap items-center gap-3">
             
+            {/* HOŞ GELDİN ROZETİ (SARI KONSEPT) */}
+            <div className="flex items-center gap-3 bg-zinc-900/80 border border-zinc-800 px-4 py-2 rounded-xl shadow-inner select-none hidden md:flex">
+              <div className="relative flex items-center justify-center">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest leading-none mb-0.5">SİSTEME GİRİŞ YAPILDI</span>
+                <span className="text-xs text-white font-black uppercase tracking-widest">HOŞ GELDİN, <span className="text-yellow-500">{username}</span></span>
+              </div>
+            </div>
+
             <button onClick={fetchWeeklyReport} disabled={isReportLoading} className="bg-blue-500/10 border border-blue-500/30 hover:bg-blue-500 hover:text-white text-blue-400 py-2 px-4 rounded-xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2">
               {isReportLoading ? "Yükleniyor..." : "📊 BEARGUARD RAPORU"}
             </button>
