@@ -21,14 +21,14 @@ export const viewport: Viewport = {
   userScalable: false, // Kullanıcının zoom yapmasını engeller, app hissi verir
 };
 
-// PWA ve SEO Metadataları
 export const metadata: Metadata = {
   title: "BearGuard OS",
   description: "Yapay Zeka Destekli Fitness ve Beslenme Sistemi",
-  manifest: "/manifest.json", // Uygulama olarak yüklenmesi için şart
+  manifest: "/manifest.json",
   icons: {
-    icon: "/icon-512.png",
-    apple: "/icon-512.png", // Apple cihazlar için özel logo yönlendirmesi
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png", // Apple cihazlar için kritik
   },
   appleWebApp: {
     capable: true,
