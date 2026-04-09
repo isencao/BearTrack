@@ -26,6 +26,10 @@ export const metadata: Metadata = {
   title: "BearGuard OS",
   description: "Yapay Zeka Destekli Fitness ve Beslenme Sistemi",
   manifest: "/manifest.json", // Uygulama olarak yüklenmesi için şart
+  icons: {
+    icon: "/icon-512.png",
+    apple: "/icon-512.png", // Apple cihazlar için özel logo yönlendirmesi
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
