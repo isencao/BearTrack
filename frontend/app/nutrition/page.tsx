@@ -51,6 +51,7 @@ export default function NutritionPage() {
   useEffect(() => {
     if (token) {
       fetchData();
+      fetchProfile(); // Token doğrulandığında profili DB'den çek
     }
   }, [token]);
 
@@ -140,6 +141,30 @@ export default function NutritionPage() {
   const authHeaders = { 
     "Content-Type": "application/json",
     "Authorization": `Bearer ${token}` 
+  };
+
+  const fetchProfile = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/profile`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.weight) {
+          setProfile({
+            weight: data.weight,
+            height: data.height || 183,
+            age: data.age || 23,
+            goal: data.goal || "cut",
+            activity: data.activity_level ? Number(data.activity_level) : 1.55
+          });
+          // Performans için veritabanındaki veriyi local'e yedekle
+          localStorage.setItem("bearProfile", JSON.stringify({
+            weight: data.weight, height: data.height || 183, age: data.age || 23, goal: data.goal || "cut", activity: data.activity_level ? Number(data.activity_level) : 1.55
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn("Profil çekilemedi", err);
+    }
   };
 
   const fetchData = async () => {
@@ -245,19 +270,13 @@ export default function NutritionPage() {
   };
 
   // ==========================================
-  // YARDIMCI FONKSİYONLAR
+  // YARDIMCI FONKSİYONLAR VE HESAPLAMALAR
   // ==========================================
   const addWater = (amount: number) => {
     const newAmount = Math.max(0, waterIntake + amount);
     setWaterIntake(newAmount);
     const dateKey = selectedDate.toDateString();
     localStorage.setItem(`bearWater_${dateKey}`, newAmount.toString());
-  };
-
-  const saveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    localStorage.setItem("bearProfile", JSON.stringify(profile));
-    setIsProfileOpen(false);
   };
 
   const handlePrint = () => window.print();
@@ -274,6 +293,41 @@ export default function NutritionPage() {
   const FAT_GOAL = Math.round((CALORIE_GOAL * 0.25) / 9);
   const CARB_GOAL = Math.round((CALORIE_GOAL - (PROTEIN_GOAL * 4 + FAT_GOAL * 9)) / 4);
   const WATER_GOAL = Math.round(profile.weight * 35);
+
+  // PROFİLİ VERİTABANINA KAYDETME İŞLEMİ (Hesaplamalara ihtiyaç duyduğu için buraya taşındı)
+  const saveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return alert("Oturum süresi dolmuş, lütfen yeniden giriş yapın.");
+
+    try {
+      const response = await fetch(`${API_BASE}/api/profile`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          weight: profile.weight,
+          height: profile.height,
+          age: profile.age,
+          goal: profile.goal,
+          activity_level: profile.activity.toString(),
+          target_calories: CALORIE_GOAL,
+          target_protein: PROTEIN_GOAL,
+          target_carbs: CARB_GOAL,
+          target_fat: FAT_GOAL
+        })
+      });
+      
+      if (response.ok) {
+        localStorage.setItem("bearProfile", JSON.stringify(profile)); // Yedek
+        setIsProfileOpen(false);
+        alert("Sistem Kalibrasyonu Bearguard Veritabanına işlendi! 🐻🛡️");
+      } else {
+        alert("Kaydetme başarısız oldu.");
+      }
+    } catch (error) {
+      console.error("Veritabanına bağlanılamadı:", error);
+      alert("Sunucuya ulaşılamıyor.");
+    }
+  };
 
   const targetDateISO = getLocalISODate(selectedDate);
   const displayedFoods = foods.filter((food) => {
@@ -494,7 +548,7 @@ export default function NutritionPage() {
               <div className="flex justify-between items-center mb-10">
                 <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                   <span className={`w-1.5 h-8 ${isCalOver ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'} rounded-full`}></span>
-                  {selectedDate.toDateString() === new Date().toDateString() ? "Günlük Yakıt Durumu" : `${selectedDate.getDate()} Özeti`}
+                  {selectedDate.toDateString() === new Date().toDateString() ? "Günlük Alınan Besin Değerleri" : `${selectedDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} Özeti`}
                 </h2>
                 {selectedDate.toDateString() === new Date().toDateString() && (
                   <button onClick={() => setIsModalOpen(true)} className="bg-yellow-500 hover:bg-yellow-400 text-black font-black py-3 px-6 rounded-2xl transition-all active:scale-95 shadow-[0_0_20px_rgba(234,179,8,0.3)] text-sm">

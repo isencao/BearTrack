@@ -11,7 +11,15 @@ class User(SQLModel, table=True):
     email: str = Field(unique=True, index=True)
     hashed_password: str
     
-    # Kullanıcının idmanları ve yemekleri
+    weight: Optional[float] = None
+    height: Optional[float] = None
+    age: Optional[int] = None
+    goal: Optional[str] = None
+    activity_level: Optional[str] = None
+    target_calories: Optional[int] = None
+    target_protein: Optional[int] = None
+    target_carbs: Optional[int] = None
+    target_fat: Optional[int] = None
     workouts: List["Workout"] = Relationship(back_populates="user")
     foods: List["FoodEntry"] = Relationship(back_populates="user")
 
@@ -20,7 +28,7 @@ class User(SQLModel, table=True):
 # ==========================================
 class Workout(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id") # YENİ: İdmanın sahibi
+    user_id: int = Field(foreign_key="user.id") 
     name: str
     date: datetime = Field(default_factory=datetime.now)
     duration_minutes: int = 0
@@ -52,7 +60,7 @@ class ExerciseSet(SQLModel, table=True):
 # ==========================================
 class FoodEntry(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id") # YENİ: Yemeğin sahibi
+    user_id: int = Field(foreign_key="user.id") 
     food_name: str
     calories: float
     protein: float
@@ -61,3 +69,4 @@ class FoodEntry(SQLModel, table=True):
     date: str
     
     user: Optional[User] = Relationship(back_populates="foods")
+

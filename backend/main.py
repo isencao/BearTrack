@@ -22,6 +22,17 @@ app = FastAPI(title="BearTrack - Vanguard OS v5.0 (Secured)")
 class AIRequest(BaseModel):
     description: str
 
+class ProfileUpdate(BaseModel):
+    weight: float
+    height: float
+    age: int
+    goal: str
+    activity_level: str
+    target_calories: int
+    target_protein: int
+    target_carbs: int
+    target_fat: int
+
 class UserRegister(BaseModel):
     username: str
     email: str
@@ -192,3 +203,24 @@ def get_weekly_report(session: Session = Depends(get_session), current_user: mod
         return {"data": data, "ai_comment": ai_comment, "username": current_user.username}
     except Exception as e:
         return {"data": data, "ai_comment": "Bearguard AI Çevrimdışı. Ama bahanelere yer yok, setleri doldur!"}
+    
+@app.post("/api/profile")
+def update_profile(data: ProfileUpdate, session: Session = Depends(get_session), current_user: models.User = Depends(get_current_user)):
+    current_user.weight = data.weight
+    current_user.height = data.height
+    current_user.age = data.age
+    current_user.goal = data.goal
+    current_user.activity_level = data.activity_level
+    current_user.target_calories = data.target_calories
+    current_user.target_protein = data.target_protein
+    current_user.target_carbs = data.target_carbs
+    current_user.target_fat = data.target_fat
+    
+    session.add(current_user)
+    session.commit()
+    return {"status": "success", "message": "Kalibrasyon Bearguard Veritabanına işlendi."}
+
+@app.get("/api/profile")
+def get_profile(current_user: models.User = Depends(get_current_user)):
+    # Sadece giriş yapan kullanıcının kendi kalibrasyon verilerini döndürür
+    return current_user
