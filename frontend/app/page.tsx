@@ -9,8 +9,10 @@ export default function Home() {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [profileData, setProfileData] = useState<any>(null);
 
+  
+  const API_BASE = "https://beartrack.onrender.com";
+
   useEffect(() => {
-    // Component yüklendiğinde token ve kullanıcı adını kontrol et
     const token = localStorage.getItem("bearToken");
     if (token) {
       setIsConnected(true);
@@ -20,13 +22,12 @@ export default function Home() {
 
   const fetchUserData = async (token: string) => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/profile", {
+      const res = await fetch(`${API_BASE}/api/profile`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
         if (data.username) setUsername(data.username);
-        // Tüm profil verisini (kilo, boy, hedef) state'e atıyoruz
         setProfileData(data); 
       }
     } catch (err) {
@@ -35,7 +36,6 @@ export default function Home() {
   };
 
   const handleLockSystem = () => {
-    // Çıkış yap
     localStorage.removeItem("bearToken");
     localStorage.removeItem("bearProfile");
     localStorage.removeItem("bearTemplates");
@@ -45,15 +45,13 @@ export default function Home() {
     window.location.reload();
   };
 
-  // Hedefleri Türkçeye Çevirme
   const goalMap: Record<string, string> = { 
     cut: "DEFİNASYON", 
-    bulk: "BÜYÜME (BULK)", 
+    bulk: "HACİM (BULK)", 
     maintain: "KORUMA" 
   };
   const displayGoal = profileData?.goal ? goalMap[profileData.goal] : "BELİRSİZ";
 
-  // Bazal Metabolizma (BMR) Hesaplama
   const bmr = profileData?.weight && profileData?.height && profileData?.age
     ? Math.round(10 * profileData.weight + 6.25 * profileData.height - 5 * profileData.age + 5)
     : 0;
@@ -65,16 +63,15 @@ export default function Home() {
         {/* HEADER */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 border-b border-zinc-800/50 pb-8 gap-6">
           <div>
-            <h2 className="text-[10px] text-zinc-500 font-black tracking-[0.3em] mb-2 uppercase">Bearguard Fitness System</h2>
+            <h2 className="text-[10px] text-zinc-500 font-black tracking-[0.3em] mb-2 uppercase text-shadow-sm">Bearguard Fitness System</h2>
             <h1 className="text-5xl md:text-7xl font-black italic tracking-tighter text-white">
               BEAR<span className="text-yellow-500">OS</span>
             </h1>
           </div>
           
-          {/* AKTİF KULLANICI ROZETİ */}
-          <div className={`flex items-center gap-3 bg-zinc-900/80 border ${isConnected ? 'border-zinc-700' : 'border-zinc-800'} px-5 py-3 rounded-xl shadow-inner select-none transition-all`}>
+          <div className={`flex items-center gap-3 bg-zinc-900/80 border ${isConnected ? 'border-yellow-500/30' : 'border-zinc-800'} px-5 py-3 rounded-xl shadow-inner select-none transition-all`}>
             <div className="relative flex items-center justify-center">
-              <div className={`w-2.5 h-2.5 ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-zinc-600'} rounded-full`}></div>
+              <div className={`w-2.5 h-2.5 ${isConnected ? 'bg-yellow-500 animate-pulse' : 'bg-zinc-600'} rounded-full`}></div>
             </div>
             <div className="flex flex-col">
               <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest leading-none mb-0.5">
@@ -87,7 +84,6 @@ export default function Home() {
           </div>
         </header>
 
-        {/* BÜYÜK GRID YAPISI */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
           {/* BEARTRACK (BESLENME) KARTI */}
@@ -106,7 +102,7 @@ export default function Home() {
             </div>
           </Link>
 
-          {/* VÜCUT PROFİLİ KARTI (YENİ EKLENDİ) */}
+          {/* VÜCUT PROFİLİ KARTI */}
           <div className="md:col-span-1 bg-zinc-900/30 border border-zinc-800 rounded-[2.5rem] p-8 relative overflow-hidden">
             <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-8 flex items-center gap-2">
               <span>📊</span> VÜCUT PROFİLİ
@@ -116,7 +112,7 @@ export default function Home() {
               <div className="space-y-6">
                 <div className="flex justify-between items-center border-b border-zinc-800/50 pb-4">
                   <span className="text-sm font-bold text-zinc-400">Ana Hedef</span>
-                  <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest">{displayGoal}</span>
+                  <span className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest">{displayGoal}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-zinc-800/50 pb-4">
                   <span className="text-sm font-bold text-zinc-400">Güncel Kilo</span>
@@ -130,7 +126,7 @@ export default function Home() {
             ) : (
               <div className="flex flex-col items-center justify-center h-40 text-center opacity-50">
                 <span className="text-3xl mb-3">⚖️</span>
-                <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest">Sistem Kalibrasyonu Bekleniyor</p>
+                <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest leading-relaxed">Sistem Kalibrasyonu<br/>Bekleniyor</p>
               </div>
             )}
             
@@ -155,7 +151,7 @@ export default function Home() {
             </p>
             
             {isConnected ? (
-              <button onClick={handleLockSystem} className="relative z-10 text-xs font-black bg-zinc-800/50 text-red-500 border border-red-500/20 px-6 py-3 rounded-xl hover:bg-red-500 hover:text-white transition-all w-full tracking-[0.2em] uppercase">
+              <button onClick={handleLockSystem} className="relative z-10 text-xs font-black bg-zinc-800/50 text-red-500 border border-red-500/20 px-6 py-3 rounded-xl hover:bg-red-600 hover:text-white transition-all w-full tracking-[0.2em] uppercase">
                 GÜVENLİ ÇIKIŞ YAP
               </button>
             ) : (
@@ -173,11 +169,11 @@ export default function Home() {
                 BEAR<span className="text-red-600">IRON</span>
               </h2>
               <p className="text-sm md:text-base text-zinc-400 font-medium mb-12 max-w-md">
-                Kapsamlı İdman Takibi, Dinamik Setler ve Akıllı Şablonlar.
+                Kapsamlı İdman Takibi, Hayalet Setler ve Akıllı Şablonlar.
               </p>
               <div className="mb-6">
                 <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest italic">
-                  "Hardcore logic for hardcore gains."
+                  "Bahane yok, sadece saf güç ve disiplin."
                 </p>
               </div>
               <div className="inline-flex items-center gap-3 border border-red-600/20 text-red-600 bg-red-600/5 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest group-hover:bg-red-600 group-hover:text-white transition-all">
