@@ -25,7 +25,7 @@ export default function WorkoutPage() {
   
   // --- TEMEL DURUMLAR (STATE) ---
   const [workoutName, setWorkoutName] = useState("");
-  const [duration, setDuration] = useState(60); 
+  const [duration, setDuration] = useState<number | string>(60); 
   const [intensity, setIntensity] = useState(5.0); 
   const [userWeight, setUserWeight] = useState<number>(0);
   const [username, setUsername] = useState<string>("OPERATÖR");
@@ -77,12 +77,12 @@ export default function WorkoutPage() {
 
     // 3. Sonra veritabanından en güncel bilgileri çek
     const fetchUserData = async () => {
-      const token = localStorage.getItem("bearToken");
-      if (!token) return;
+      const savedToken = localStorage.getItem("bearToken");
+      if (!savedToken) return;
 
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/profile", {
-          headers: { "Authorization": `Bearer ${token}` }
+        const res = await fetch(`${API_BASE}/api/profile`, {
+          headers: { "Authorization": `Bearer ${savedToken}` }
         });
         if (res.ok) {
           const data = await res.json();
@@ -111,7 +111,6 @@ export default function WorkoutPage() {
 
   // OTOMATİK KALORİ HESAPLAYICI
   useEffect(() => {
-    // Kilo yoksa veya süre sıfırsa hesaplama yapma (NaN hatasını engeller)
     if (!userWeight || !duration) {
       setBurnedCalories(0);
       return;
@@ -222,7 +221,8 @@ export default function WorkoutPage() {
   };
 
   const updateSet = (exerciseId: number, setId: number, field: string, value: string) => {
-    const safeValue = Number(value) < 0 ? "0" : value;
+    let safeValue = value === "" ? "" : Number(value).toString();
+    if (Number(safeValue) < 0) safeValue = "0";
     setExercises(exercises.map(ex => ex.id === exerciseId ? { ...ex, sets: ex.sets.map(s => s.id === setId ? { ...s, [field]: safeValue } : s) } : ex));
   };
   
@@ -234,7 +234,7 @@ export default function WorkoutPage() {
     setIsLoading(true);
     
     const workoutPayload = {
-      name: workoutName, duration: duration, totalVolume: 0, 
+      name: workoutName, duration: Number(duration) || 0, totalVolume: 0, 
       exercises: exercises.map((ex) => ({
         name: ex.name || "İsimsiz Hareket",
         sets: ex.sets.map((s, index) => ({ setNo: index + 1, weight: Number(s.weight) || 0, reps: Number(s.reps) || 0, completed: true }))
@@ -256,6 +256,14 @@ export default function WorkoutPage() {
     } catch (err) { alert(`Sunucuya ulaşılamıyor!`); } finally { setIsLoading(false); }
   };
 
+  // --- ÇIKIŞ İŞLEMİ ---
+  const handleLogout = () => {
+    localStorage.removeItem("bearToken");
+    localStorage.removeItem("bearProfile"); 
+    localStorage.removeItem("bearTemplates"); 
+    router.push("/");
+  };
+
   const preventInvalidKeys = (e: any) => {
     if (e.key === '-' || e.key === 'e' || e.key === '+' || e.key === '.') e.preventDefault();
   };
@@ -264,51 +272,80 @@ export default function WorkoutPage() {
     <main className="min-h-screen bg-black text-zinc-100 p-4 md:p-12 font-sans selection:bg-red-600 selection:text-white relative pb-32">
       <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
         
-        {/* HEADER */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-zinc-800/50 mb-6 gap-4">
-          <Link href="/">
-            <h1 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white hover:text-red-600 transition-all cursor-pointer">
-              BEAR<span className="text-red-600">IRON</span>
-            </h1>
-          </Link>
+        {/* --- HEADER (BEARIron Konsepti, Nutrition Tasarımı) --- */}
+        <header className="flex flex-col space-y-6 pb-6 border-b border-zinc-800/50 mb-6">
           
-          <div className="flex items-center gap-4">
-            {/* HOŞ GELDİN ROZETİ */}
-            <div className="flex items-center gap-3 bg-zinc-900/80 border border-zinc-800 px-4 py-2 rounded-xl shadow-inner select-none">
-              <div className="relative flex items-center justify-center">
-                <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>
+          {/* ÜST KATMAN: LOGO VE OPERATÖR BİLGİSİ */}
+          <div className="flex justify-between items-center">
+            <Link href="/">
+              <div className="hover:opacity-80 transition-opacity cursor-pointer">
+                <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter text-white">
+                  BEAR<span className="text-red-600">IRON</span>
+                </h1>
+                <p className="text-zinc-500 font-medium mt-0.5 uppercase tracking-[0.3em] text-[10px] md:text-xs italic">Bearguard System</p>
               </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest leading-none mb-0.5">SİSTEME GİRİŞ YAPILDI</span>
-                <span className="text-xs text-white font-black uppercase tracking-widest">HOŞ GELDİN, <span className="text-red-600">{username}</span></span>
+            </Link>
+
+            {/* OPERATÖR KARTI: Kırmızı konseptiyle */}
+            <div className="flex items-center gap-4 bg-zinc-900/50 border border-zinc-800/80 px-6 py-3.5 rounded-[1.5rem] shadow-inner group transition-all hover:border-red-600/40 hidden md:flex">
+              <div className="relative flex items-center justify-center">
+                <div className="w-2.5 h-2.5 bg-red-600 rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 w-2.5 h-2.5 bg-red-600 rounded-full blur-md opacity-60"></div>
+              </div>
+              <div className="flex flex-col text-right">
+                <span className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em] leading-none mb-1.5">
+                  SİSTEME GİRİŞ YAPILDI
+                </span>
+                <span className="text-sm md:text-base text-white font-black uppercase tracking-tighter group-hover:text-red-600 transition-colors">
+                  HOŞ GELDİN, <span className="text-red-600">{username}</span>
+                </span>
               </div>
             </div>
+            
+            {/* MOBİL İÇİN KÜÇÜK ROZET */}
+            <div className="flex items-center gap-2 bg-zinc-900/80 border border-zinc-800 px-3 py-2 rounded-xl shadow-inner select-none md:hidden">
+              <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>
+              <span className="text-[10px] text-white font-black uppercase tracking-widest">
+                {username}
+              </span>
+            </div>
+          </div>
 
-            <Link href="/nutrition" className="bg-zinc-900 border border-zinc-800 hover:border-red-600 text-zinc-400 py-3 px-4 rounded-xl transition-all text-xs font-black uppercase tracking-widest h-full flex items-center">
+          {/* ALT KATMAN: NAVİGASYON BUTONLARI (Tam Genişlik, Kaydırılabilir) */}
+          <div className="flex flex-nowrap items-center gap-3 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <Link href="/nutrition" className="flex-shrink-0 whitespace-nowrap bg-zinc-900 border border-zinc-700 text-zinc-300 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:border-red-600">
               🍽️ BESLENME
             </Link>
+
+            <button onClick={() => alert("Profil Ayarları (Beslenme sayfasından erişilebilir)")} className="flex-shrink-0 whitespace-nowrap bg-zinc-900 border border-zinc-700 text-zinc-300 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:border-red-600">
+              ⚙️ PROFİL
+            </button>
+            
+            <button onClick={handleLogout} className="flex-shrink-0 whitespace-nowrap bg-zinc-900 border border-red-900/50 text-red-500 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:bg-red-600 hover:text-white mr-4">
+              🚪 ÇIKIŞ
+            </button>
           </div>
         </header>
 
-        {/* ŞABLON ŞERİDİ */}
-        <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden items-center">
-          <button onClick={resetWorkout} className="whitespace-nowrap px-4 py-2 bg-zinc-900/40 border border-zinc-800 text-red-600 hover:bg-red-600 hover:text-white transition-all text-xs font-black rounded-lg">
+        {/* --- ŞABLON ŞERİDİ (Nutrition Header Tasarımına Uygun Akışkan Yapı) --- */}
+        <div className="flex flex-nowrap gap-3 overflow-x-auto pb-4 mb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] items-center">
+          <button onClick={resetWorkout} className="flex-shrink-0 whitespace-nowrap px-6 py-3.5 bg-zinc-900/40 border border-zinc-800 text-red-600 hover:bg-red-600 hover:text-white transition-all text-xs font-black rounded-2xl">
             🔄 SIFIRLA
           </button>
           
-          <div className="w-px h-6 bg-zinc-800 mx-1"></div>
+          <div className="flex-shrink-0 w-px h-8 bg-zinc-800 mx-1"></div>
 
           {templates.map((t, i) => (
-            <div key={i} className="flex items-center bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden group flex-shrink-0">
-              <button type="button" onClick={() => loadTemplate(t)} className="px-4 py-2 text-xs font-bold text-zinc-300 hover:text-red-600 transition-all">
+            <div key={i} className="flex-shrink-0 flex items-center bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden group whitespace-nowrap">
+              <button type="button" onClick={() => loadTemplate(t)} className="px-6 py-3.5 text-xs font-bold text-zinc-300 hover:text-red-600 transition-all">
                 ⚡ {t.name}
               </button>
-              <button type="button" onClick={() => deleteTemplate(t.name)} className="px-3 py-2 text-xs text-zinc-600 hover:text-red-600 hover:bg-red-900/20 transition-all border-l border-zinc-800">
+              <button type="button" onClick={() => deleteTemplate(t.name)} className="px-5 py-3.5 text-xs text-zinc-600 hover:text-red-600 hover:bg-red-900/20 transition-all border-l border-zinc-800">
                 ✕
               </button>
             </div>
           ))}
-          <button onClick={saveAsTemplate} className="whitespace-nowrap px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-black rounded-lg transition-all shadow-lg ml-2 flex-shrink-0">
+          <button onClick={saveAsTemplate} className="flex-shrink-0 whitespace-nowrap px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white text-xs font-black rounded-2xl transition-all shadow-[0_0_20px_rgba(220,38,38,0.3)] ml-2">
             + ŞABLON KAYDET
           </button>
         </div>
@@ -328,7 +365,7 @@ export default function WorkoutPage() {
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest pl-1">Süre (Dk)</span>
-              <input type="number" min="1" onKeyDown={preventInvalidKeys} placeholder="Dk" value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="w-16 bg-zinc-800 border border-zinc-700 rounded-xl p-2 text-center text-white font-bold outline-none focus:border-red-600 transition-all" />
+              <input type="number" min="1" onKeyDown={preventInvalidKeys} placeholder="Dk" value={duration} onChange={(e) => setDuration(e.target.value === "" ? "" : Number(e.target.value).toString())} className="w-16 bg-zinc-800 border border-zinc-700 rounded-xl p-2 text-center text-white font-bold outline-none focus:border-red-600 transition-all" />
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-red-600 font-bold uppercase tracking-widest pl-1">🔥 KCAL</span>

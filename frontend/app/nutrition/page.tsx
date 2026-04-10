@@ -30,7 +30,6 @@ export default function NutritionPage() {
   const [reportData, setReportData] = useState<any>(null);
   const [isReportLoading, setIsReportLoading] = useState(false);
 
-  // KULLANICI ADI STATE'İ (YENİ EKLENDİ)
   const [username, setUsername] = useState<string>("OPERATÖR");
 
   const [profile, setProfile] = useState({
@@ -56,16 +55,17 @@ export default function NutritionPage() {
   useEffect(() => {
     if (token) {
       fetchData();
-      fetchProfile(); // Token doğrulandığında profili DB'den çek
+      fetchProfile();
     }
   }, [token]);
 
+  // DÜZELTME: Su verisi çekilirken kullanıcı adı (username) de anahtara eklendi
   useEffect(() => {
     const dateKey = selectedDate.toDateString();
-    const savedWater = localStorage.getItem(`bearWater_${dateKey}`);
+    const savedWater = localStorage.getItem(`bearWater_${username}_${dateKey}`);
     if (savedWater) setWaterIntake(parseInt(savedWater));
     else setWaterIntake(0);
-  }, [selectedDate]);
+  }, [selectedDate, username]);
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories(prev => ({ ...prev, [categoryId]: !prev[categoryId] }));
@@ -125,7 +125,6 @@ export default function NutritionPage() {
       setToken(data.access_token);
       setIsAuthModalOpen(false);
       
-      // GİRİŞ BAŞARILIYSA ANA SAYFAYA (BEAR OS) YÖNLENDİR
       router.push("/");
     } catch (err: any) {
       setAuthError(err.message);
@@ -135,20 +134,17 @@ export default function NutritionPage() {
   };
 
   const handleLogout = () => {
-  // 1. Tüm Bearguard tarayıcı kalıntılarını sil!
   localStorage.removeItem("bearToken");
   localStorage.removeItem("bearProfile"); 
   localStorage.removeItem("bearTemplates"); 
   
-  // 2. State'leri (Aktif Ekranı) Sıfırla
   setToken(null);
   setFoods([]);
   setAuthUsername("");
   setAuthPassword("");
   
-  // Eğer nutrition sayfasındaysan profili de sıfırla
   if (typeof setProfile === 'function') {
-    setProfile({ weight: 0, height: 0, age: 0, activity: 1.55, goal: "cut" });
+    setProfile({ weight: 0 as any, height: 0 as any, age: 0 as any, activity: 1.55, goal: "cut" });
   }
 
   setIsAuthModalOpen(true);
@@ -168,7 +164,6 @@ export default function NutritionPage() {
       if (res.ok) {
         const data = await res.json();
         
-        // KULLANICI ADINI KAYDET
         if (data.username) {
           setUsername(data.username);
         }
@@ -181,7 +176,6 @@ export default function NutritionPage() {
             goal: data.goal || "cut",
             activity: data.activity_level ? Number(data.activity_level) : 1.55
           });
-          // Performans için veritabanındaki veriyi local'e yedekle
           localStorage.setItem("bearProfile", JSON.stringify({
             weight: data.weight, height: data.height || 183, age: data.age || 23, goal: data.goal || "cut", activity: data.activity_level ? Number(data.activity_level) : 1.55
           }));
@@ -297,29 +291,33 @@ export default function NutritionPage() {
   // ==========================================
   // YARDIMCI FONKSİYONLAR VE HESAPLAMALAR
   // ==========================================
+  
+  // DÜZELTME: Su eklenirken kullanıcı adı (username) de anahtara eklendi
   const addWater = (amount: number) => {
     const newAmount = Math.max(0, waterIntake + amount);
     setWaterIntake(newAmount);
     const dateKey = selectedDate.toDateString();
-    localStorage.setItem(`bearWater_${dateKey}`, newAmount.toString());
+    localStorage.setItem(`bearWater_${username}_${dateKey}`, newAmount.toString());
   };
 
   const handlePrint = () => window.print();
 
-  // Hesaplamalar
-  const BMR = (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + 5;
+  const weightSafe = profile.weight || 0;
+  const heightSafe = profile.height || 0;
+  const ageSafe = profile.age || 0;
+
+  const BMR = (10 * weightSafe) + (6.25 * heightSafe) - (5 * ageSafe) + 5;
   const TDEE = BMR * profile.activity;
   let CALORIE_GOAL = TDEE;
   if (profile.goal === "cut") CALORIE_GOAL -= 500;
   if (profile.goal === "bulk") CALORIE_GOAL += 500;
   CALORIE_GOAL = Math.round(CALORIE_GOAL);
 
-  const PROTEIN_GOAL = Math.round(profile.weight * 2.2);
+  const PROTEIN_GOAL = Math.round(weightSafe * 2.2);
   const FAT_GOAL = Math.round((CALORIE_GOAL * 0.25) / 9);
   const CARB_GOAL = Math.round((CALORIE_GOAL - (PROTEIN_GOAL * 4 + FAT_GOAL * 9)) / 4);
-  const WATER_GOAL = Math.round(profile.weight * 35);
+  const WATER_GOAL = Math.round(weightSafe * 35);
 
-  // PROFİLİ VERİTABANINA KAYDETME İŞLEMİ (Hesaplamalara ihtiyaç duyduğu için buraya taşındı)
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return alert("Oturum süresi dolmuş, lütfen yeniden giriş yapın.");
@@ -342,7 +340,7 @@ export default function NutritionPage() {
       });
       
       if (response.ok) {
-        localStorage.setItem("bearProfile", JSON.stringify(profile)); // Yedek
+        localStorage.setItem("bearProfile", JSON.stringify(profile)); 
         setIsProfileOpen(false);
         alert("Sistem Kalibrasyonu Bearguard Veritabanına işlendi! 🐻🛡️");
       } else {
@@ -379,11 +377,11 @@ export default function NutritionPage() {
   const isCarbOver = totalCarbs > CARB_GOAL;
   const isFatOver = totalFats > FAT_GOAL;
 
-  const calWidth = Math.min((totalCals / DYNAMIC_CALORIE_GOAL) * 100, 100);
-  const protWidth = Math.min((totalProt / PROTEIN_GOAL) * 100, 100);
-  const carbWidth = Math.min((totalCarbs / CARB_GOAL) * 100, 100);
-  const fatWidth = Math.min((totalFats / FAT_GOAL) * 100, 100);
-  const waterWidth = Math.min((waterIntake / WATER_GOAL) * 100, 100);
+  const calWidth = Math.min((totalCals / DYNAMIC_CALORIE_GOAL) * 100, 100) || 0;
+  const protWidth = Math.min((totalProt / PROTEIN_GOAL) * 100, 100) || 0;
+  const carbWidth = Math.min((totalCarbs / CARB_GOAL) * 100, 100) || 0;
+  const fatWidth = Math.min((totalFats / FAT_GOAL) * 100, 100) || 0;
+  const waterWidth = Math.min((waterIntake / WATER_GOAL) * 100, 100) || 0;
 
   const weekDays = [...Array(7)].map((_, i) => {
     const d = new Date();
@@ -438,7 +436,6 @@ export default function NutritionPage() {
   // EKRANLAR (RENDER)
   // ==========================================
 
-  // Eğer kilit ekranı açıksa SADECE LOGIN/REGISTER MODALI gösterilir
   if (isAuthModalOpen) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden font-sans">
@@ -467,13 +464,13 @@ export default function NutritionPage() {
           <form onSubmit={authMode === "login" ? handleLogin : handleRegister} className="space-y-5">
             <div>
               <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">Kullanıcı Adı</label>
-              <input type="text" required value={authUsername} onChange={(e) => setAuthUsername(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="bear_furkan" />
+              <input type="text" required value={authUsername} onChange={(e) => setAuthUsername(e.target.value.replace(/\s/g, ""))} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="bear_furkan" />
             </div>
 
             {authMode === "register" && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">E-Posta</label>
-                <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="furkan@bearguard.com" />
+                <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value.replace(/\s/g, ""))} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="furkan@bearguard.com" />
               </div>
             )}
 
@@ -496,44 +493,55 @@ export default function NutritionPage() {
     <main className="min-h-screen bg-black text-zinc-100 p-6 md:p-12 font-sans selection:bg-yellow-500 selection:text-black">
       <div className="max-w-5xl mx-auto print:hidden">
         
-        {/* HEADER (YENİ ROZET TASARIMIYLA GÜNCELLENDİ) */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-zinc-800/50 mb-6 gap-4">
-          <Link href="/">
-            <div className="hover:opacity-80 transition-opacity cursor-pointer">
-              <h1 className="text-5xl font-black italic tracking-tighter text-white">
-                BEAR<span className="text-yellow-500">TRACK</span>
-              </h1>
-              <p className="text-zinc-500 font-medium mt-1 uppercase tracking-widest text-xs">Bearguard Beslenme Sistemi</p>
-            </div>
-          </Link>
+ {/* HEADER - BEAROS SYSTEM INTERFACE */}
+        <header className="flex flex-col space-y-6 pb-6 border-b border-zinc-800/50 mb-6">
           
-          <div className="flex flex-wrap items-center gap-3">
-            
-            {/* HOŞ GELDİN ROZETİ (SARI KONSEPT) */}
-            <div className="flex items-center gap-3 bg-zinc-900/80 border border-zinc-800 px-4 py-2 rounded-xl shadow-inner select-none hidden md:flex">
-              <div className="relative flex items-center justify-center">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+          {/* ÜST KATMAN: LOGO VE OPERATÖR BİLGİSİ */}
+          <div className="flex justify-between items-center">
+            <Link href="/">
+              <div className="hover:opacity-80 transition-opacity cursor-pointer">
+                <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter text-white">
+                  BEAR<span className="text-yellow-500">TRACK</span>
+                </h1>
+                <p className="text-zinc-500 font-medium mt-0.5 uppercase tracking-[0.3em] text-[10px] md:text-xs italic">Vanguard System</p>
               </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest leading-none mb-0.5">SİSTEME GİRİŞ YAPILDI</span>
-                <span className="text-xs text-white font-black uppercase tracking-widest">HOŞ GELDİN, <span className="text-yellow-500">{username}</span></span>
-              </div>
-            </div>
-
-            <button onClick={fetchWeeklyReport} disabled={isReportLoading} className="bg-blue-500/10 border border-blue-500/30 hover:bg-blue-500 hover:text-white text-blue-400 py-2 px-4 rounded-xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2">
-              {isReportLoading ? "Yükleniyor..." : "📊 BEARGUARD RAPORU"}
-            </button>
-
-            <Link href="/workout" className="bg-red-500/10 border border-red-500/20 hover:bg-red-500 hover:text-white text-red-500 py-2 px-4 rounded-xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2">
-              🏋️ ANTRENMAN
             </Link>
 
-            <button onClick={() => setIsProfileOpen(true)} className="bg-zinc-900 border border-zinc-700 hover:border-yellow-500 text-zinc-300 py-2 px-4 rounded-xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2">
-              ⚙️ ÖLÇÜLERİM
+            {/* OPERATÖR KARTI: KONSEPT RENKLERİYLE (BEYAZ/SARI) SENKRONİZE EDİLDİ */}
+            <div className="flex items-center gap-4 bg-zinc-900/50 border border-zinc-800/80 px-6 py-3.5 rounded-[1.5rem] shadow-inner group transition-all hover:border-yellow-500/40">
+              <div className="relative flex items-center justify-center">
+                {/* Durum ışığı konsept rengi olan sarıya (yellow-500) geri döndü */}
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 w-2 h-2 bg-yellow-500 rounded-full blur-md opacity-60"></div>
+              </div>
+              <div className="flex flex-col text-right">
+                {/* Üst etiket daha profesyonel bir gri tonunda, konsepti bozmuyor */}
+                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] leading-none mb-1">
+                  SİSTEME GİRİŞ YAPILDI
+                </span>
+                {/* Nick kısmı logodaki gibi sarı vurgulu ve beyazla dengeli */}
+                <span className="text-sm md:text-base text-white font-black uppercase tracking-tighter">
+                  HOŞ GELDİN, <span className="text-yellow-500 group-hover:text-yellow-400 transition-colors">{username}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ALT KATMAN: NAVİGASYON BUTONLARI (Tam Genişlik) */}
+          <div className="flex flex-nowrap items-center gap-3 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <button onClick={fetchWeeklyReport} disabled={isReportLoading} className="flex-shrink-0 whitespace-nowrap bg-blue-500/10 border border-blue-500/30 text-blue-400 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:bg-blue-500 hover:text-white">
+              {isReportLoading ? "..." : "📊 RAPOR"}
+            </button>
+
+            <Link href="/workout" className="flex-shrink-0 whitespace-nowrap bg-red-500/10 border border-red-500/20 text-red-500 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:bg-red-500 hover:text-white">
+              🏋️ İDMAN
+            </Link>
+
+            <button onClick={() => setIsProfileOpen(true)} className="flex-shrink-0 whitespace-nowrap bg-zinc-900 border border-zinc-700 text-zinc-300 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:border-yellow-500">
+              ⚙️ PROFİL
             </button>
             
-            {/* ÇIKIŞ YAP BUTONU */}
-            <button onClick={handleLogout} className="bg-zinc-900 border border-red-900/50 hover:bg-red-500 hover:text-white text-red-500 py-2 px-4 rounded-xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2">
+            <button onClick={handleLogout} className="flex-shrink-0 whitespace-nowrap bg-zinc-900 border border-red-900/50 text-red-500 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:bg-red-600 hover:text-white">
               🚪 ÇIKIŞ
             </button>
           </div>
@@ -587,7 +595,6 @@ export default function NutritionPage() {
                   <span className={`w-1.5 h-8 ${isCalOver ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'} rounded-full`}></span>
                   {selectedDate.toDateString() === new Date().toDateString() ? "Günlük Alınan Besin Değerleri" : `${selectedDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} Özeti`}
                 </h2>
-                {/* Butonu her gün için görünür kıldık */}
                 <button onClick={() => setIsModalOpen(true)} className="bg-yellow-500 hover:bg-yellow-400 text-black font-black py-3 px-6 rounded-2xl transition-all active:scale-95 shadow-[0_0_20px_rgba(234,179,8,0.3)] text-sm">
                   + ÖĞÜN EKLE
                 </button>
@@ -761,7 +768,7 @@ export default function NutritionPage() {
         </div>
       )}
 
-      {/* KALİBRASYON MODALI VE DİĞER MODALLAR AYNI ŞEKİLDE DURUYOR (KARMAŞA OLMAMASI İÇİN KISALTILMADAN EKLENDİ) */}
+      {/* KALİBRASYON MODALI */}
       {isProfileOpen && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[100] backdrop-blur-md print:hidden">
           <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-10 w-full max-w-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row gap-8">
@@ -772,12 +779,36 @@ export default function NutritionPage() {
               </div>
               <form onSubmit={saveProfile} className="space-y-5">
                 <div className="grid grid-cols-2 gap-5">
-                  <div><label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Kilo (kg)</label><input type="number" required value={profile.weight} onChange={(e) => setProfile({...profile, weight: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" /></div>
-                  <div><label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Boy (cm)</label><input type="number" required value={profile.height} onChange={(e) => setProfile({...profile, height: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" /></div>
-                  <div><label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Yaş</label><input type="number" required value={profile.age} onChange={(e) => setProfile({...profile, age: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" /></div>
-                  <div><label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Hedef</label><select value={profile.goal} onChange={(e) => setProfile({...profile, goal: e.target.value})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none"><option value="cut">Definasyon (-500)</option><option value="maintain">Koruma (0)</option><option value="bulk">Bulk (+500)</option></select></div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Kilo (kg)</label>
+                    <input type="number" required value={profile.weight} onChange={(e) => setProfile({...profile, weight: e.target.value === "" ? ("" as any) : Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Boy (cm)</label>
+                    <input type="number" required value={profile.height} onChange={(e) => setProfile({...profile, height: e.target.value === "" ? ("" as any) : Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Yaş</label>
+                    <input type="number" required value={profile.age} onChange={(e) => setProfile({...profile, age: e.target.value === "" ? ("" as any) : Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Hedef</label>
+                    <select value={profile.goal} onChange={(e) => setProfile({...profile, goal: e.target.value})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none">
+                      <option value="cut">Definasyon (-500)</option>
+                      <option value="maintain">Koruma (0)</option>
+                      <option value="bulk">Bulk (+500)</option>
+                    </select>
+                  </div>
                 </div>
-                <div><label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Aktivite Seviyesi</label><select value={profile.activity} onChange={(e) => setProfile({...profile, activity: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none"><option value={1.2}>Masa Başı / Hareketsiz</option><option value={1.375}>Hafif Egzersiz (1-3 gün)</option><option value={1.55}>Orta Egzersiz (3-5 gün)</option><option value={1.725}>Ağır Egzersiz (6-7 gün)</option></select></div>
+                <div>
+                  <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Aktivite Seviyesi</label>
+                  <select value={profile.activity} onChange={(e) => setProfile({...profile, activity: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none">
+                    <option value={1.2}>Masa Başı / Hareketsiz</option>
+                    <option value={1.375}>Hafif Egzersiz (1-3 gün)</option>
+                    <option value={1.55}>Orta Egzersiz (3-5 gün)</option>
+                    <option value={1.725}>Ağır Egzersiz (6-7 gün)</option>
+                  </select>
+                </div>
                 <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl mt-4">KALİBRASYONU ONAYLA</button>
               </form>
             </div>
