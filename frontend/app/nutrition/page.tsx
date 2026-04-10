@@ -17,7 +17,6 @@ export default function NutritionPage() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
-  
   const [foods, setFoods] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -51,7 +50,6 @@ export default function NutritionPage() {
     if (savedProfile) setProfile(JSON.parse(savedProfile));
   }, []);
 
-  
   useEffect(() => {
     if (token) {
       fetchData();
@@ -59,7 +57,6 @@ export default function NutritionPage() {
     }
   }, [token]);
 
-  // DÜZELTME: Su verisi çekilirken kullanıcı adı (username) de anahtara eklendi
   useEffect(() => {
     const dateKey = selectedDate.toDateString();
     const savedWater = localStorage.getItem(`bearWater_${username}_${dateKey}`);
@@ -108,7 +105,6 @@ export default function NutritionPage() {
     setAuthError("");
     setAuthLoading(true);
     try {
-      
       const formData = new URLSearchParams();
       formData.append("username", authUsername);
       formData.append("password", authPassword);
@@ -134,21 +130,21 @@ export default function NutritionPage() {
   };
 
   const handleLogout = () => {
-  localStorage.removeItem("bearToken");
-  localStorage.removeItem("bearProfile"); 
-  localStorage.removeItem("bearTemplates"); 
-  
-  setToken(null);
-  setFoods([]);
-  setAuthUsername("");
-  setAuthPassword("");
-  
-  if (typeof setProfile === 'function') {
-    setProfile({ weight: 0 as any, height: 0 as any, age: 0 as any, activity: 1.55, goal: "cut" });
-  }
+    localStorage.removeItem("bearToken");
+    localStorage.removeItem("bearProfile"); 
+    localStorage.removeItem("bearTemplates"); 
+    
+    setToken(null);
+    setFoods([]);
+    setAuthUsername("");
+    setAuthPassword("");
+    
+    if (typeof setProfile === 'function') {
+      setProfile({ weight: 0 as any, height: 0 as any, age: 0 as any, activity: 1.55, goal: "cut" });
+    }
 
-  setIsAuthModalOpen(true);
-};
+    setIsAuthModalOpen(true);
+  };
 
   // ==========================================
   // API İŞLEMLERİ (TOKEN KORUMALI)
@@ -288,11 +284,6 @@ export default function NutritionPage() {
     }
   };
 
-  // ==========================================
-  // YARDIMCI FONKSİYONLAR VE HESAPLAMALAR
-  // ==========================================
-  
-  // DÜZELTME: Su eklenirken kullanıcı adı (username) de anahtara eklendi
   const addWater = (amount: number) => {
     const newAmount = Math.max(0, waterIntake + amount);
     setWaterIntake(newAmount);
@@ -432,10 +423,6 @@ export default function NutritionPage() {
     .slice(0, 6)
     .map(name => foods.find(f => (f.food_name.split("::")[1] || f.food_name) === name));
 
-  // ==========================================
-  // EKRANLAR (RENDER)
-  // ==========================================
-
   if (isAuthModalOpen) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden font-sans">
@@ -488,46 +475,38 @@ export default function NutritionPage() {
     );
   }
 
-  // --- ANA UYGULAMA EKRANI ---
   return (
-    <main className="min-h-screen bg-black text-zinc-100 p-6 md:p-12 font-sans selection:bg-yellow-500 selection:text-black">
+    <main className="min-h-screen bg-black text-zinc-100 p-4 md:p-12 font-sans selection:bg-yellow-500 selection:text-black">
       <div className="max-w-5xl mx-auto print:hidden">
         
- {/* HEADER - BEAROS SYSTEM INTERFACE */}
+        {/* --- HEADER --- */}
         <header className="flex flex-col space-y-6 pb-6 border-b border-zinc-800/50 mb-6">
-          
-          {/* ÜST KATMAN: LOGO VE OPERATÖR BİLGİSİ */}
-          <div className="flex justify-between items-center">
-            <Link href="/">
+          <div className="flex justify-between items-center w-full gap-2">
+            <Link href="/" className="flex-shrink-0">
               <div className="hover:opacity-80 transition-opacity cursor-pointer">
-                <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter text-white">
+                <h1 className="text-3xl md:text-6xl font-black italic tracking-tighter text-white">
                   BEAR<span className="text-yellow-500">TRACK</span>
                 </h1>
-                <p className="text-zinc-500 font-medium mt-0.5 uppercase tracking-[0.3em] text-[10px] md:text-xs italic">Vanguard System</p>
+                <p className="text-zinc-500 font-medium mt-0.5 uppercase tracking-[0.3em] text-[7px] md:text-xs italic">Vanguard System</p>
               </div>
             </Link>
 
-            {/* OPERATÖR KARTI: KONSEPT RENKLERİYLE (BEYAZ/SARI) SENKRONİZE EDİLDİ */}
-            <div className="flex items-center gap-4 bg-zinc-900/50 border border-zinc-800/80 px-6 py-3.5 rounded-[1.5rem] shadow-inner group transition-all hover:border-yellow-500/40">
-              <div className="relative flex items-center justify-center">
-                {/* Durum ışığı konsept rengi olan sarıya (yellow-500) geri döndü */}
-                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                <div className="absolute inset-0 w-2 h-2 bg-yellow-500 rounded-full blur-md opacity-60"></div>
+            <div className="flex items-center gap-2 md:gap-4 bg-zinc-900/50 border border-zinc-800/80 px-3 py-2 md:px-6 md:py-3.5 rounded-xl md:rounded-[1.5rem] shadow-inner group transition-all hover:border-yellow-500/40 flex-shrink min-w-0">
+              <div className="relative flex items-center justify-center flex-shrink-0">
+                <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 w-1.5 h-1.5 md:w-2 md:h-2 bg-yellow-500 rounded-full blur-md opacity-60"></div>
               </div>
-              <div className="flex flex-col text-right">
-                {/* Üst etiket daha profesyonel bir gri tonunda, konsepti bozmuyor */}
-                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] leading-none mb-1">
+              <div className="flex flex-col text-right min-w-0">
+                <span className="text-[6px] md:text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] leading-none mb-1 md:mb-1.5 truncate">
                   SİSTEME GİRİŞ YAPILDI
                 </span>
-                {/* Nick kısmı logodaki gibi sarı vurgulu ve beyazla dengeli */}
-                <span className="text-sm md:text-base text-white font-black uppercase tracking-tighter">
+                <span className="text-[9px] md:text-base text-white font-black uppercase tracking-tighter truncate">
                   HOŞ GELDİN, <span className="text-yellow-500 group-hover:text-yellow-400 transition-colors">{username}</span>
                 </span>
               </div>
             </div>
           </div>
 
-          {/* ALT KATMAN: NAVİGASYON BUTONLARI (Tam Genişlik) */}
           <div className="flex flex-nowrap items-center gap-3 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <button onClick={fetchWeeklyReport} disabled={isReportLoading} className="flex-shrink-0 whitespace-nowrap bg-blue-500/10 border border-blue-500/30 text-blue-400 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:bg-blue-500 hover:text-white">
               {isReportLoading ? "..." : "📊 RAPOR"}
