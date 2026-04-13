@@ -4,6 +4,8 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlmodel import Session
 import os
 import json
+import secrets  # Rastgele şifre için eklendi
+import string   # Karakter setleri için eklendi
 from groq import Groq
 from dotenv import load_dotenv
 from typing import List
@@ -38,10 +40,8 @@ class UserRegister(BaseModel):
     email: str
     password: str
 
-# --- YENİ EKLENEN: Şifre Sıfırlama Veri Modeli ---
 class ResetRequest(BaseModel):
     username: str
-# -------------------------------------------------
 
 app.add_middleware(
     CORSMiddleware,
@@ -91,7 +91,6 @@ def register_user(user_data: UserRegister, session: Session = Depends(get_sessio
     if db_email:
         raise HTTPException(status_code=400, detail="Bu e-posta adresi zaten kayıtlı.")
 
-    # bear_auth çağrılıyor
     hashed_pw = bear_auth.get_password_hash(user_data.password) 
     
     new_user = models.User(
@@ -116,30 +115,28 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), ses
     access_token = bear_auth.create_access_token(data={"sub": user.username}) 
     return {"access_token": access_token, "token_type": "bearer"}
 
-# --- YENİ EKLENEN: DEMO ŞİFRE SIFIRLAMA UCU ---
+# --- YENİ EKLENEN: RASTGELE ŞİFRE ÜRETEN DEMO SIFIRLAMA ---
 @app.post("/api/auth/reset-demo")
 def reset_password_demo(request: ResetRequest, session: Session = Depends(get_session)):
-    # 1. Kullanıcıyı bul
     user = AuthRepository.get_user_by_username(session, request.username)
-    
     if not user:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
     
-    # 2. Geçici şifreyi belirle ve hashle
-    temp_password = "BearGuard2026"
-    hashed_pw = bear_auth.get_password_hash(temp_password)
+    # 8 haneli rastgele şifre üretimi
+    alphabet = string.ascii_letters + string.digits
+    temp_password = ''.join(secrets.choice(alphabet) for i in range(8))
     
-    # 3. Veritabanını güncelle
+    hashed_pw = bear_auth.get_password_hash(temp_password)
     user.hashed_password = hashed_pw
+    
     session.add(user)
     session.commit()
     
     return {
         "success": True, 
-        "message": "Demo Modu: Şifre sıfırlandı.", 
+        "message": "Demo Modu: Şifre rastgele olarak sıfırlandı.", 
         "temp_password": temp_password
     }
-# ----------------------------------------------
 
 @app.get("/api/food/")
 def get_all_foods(session: Session = Depends(get_session), current_user: models.User = Depends(get_current_user)):
@@ -218,8 +215,6 @@ def get_weekly_report(session: Session = Depends(get_session), current_user: mod
     - Ortalama Günlük Protein: {data['avg_protein']} g
 
     Bu verilere bakarak {current_user.username}'a bodybuilding odaklı, sert ve net bir değerlendirme yap. 
-    Eğer haftalık toplam set sayısı düşükse (örneğin 40-50'nin altıysa) hacmi artırmasını emret.
-    Ortalama günlük protein 150g'ın altındaysa kas yıkımı uyarısı yap.
     Askeri ve motive edici bir dil kullan. Asla 4 cümleyi geçme.
     """
     
@@ -231,7 +226,7 @@ def get_weekly_report(session: Session = Depends(get_session), current_user: mod
         ai_comment = chat_completion.choices[0].message.content
         return {"data": data, "ai_comment": ai_comment, "username": current_user.username}
     except Exception as e:
-        return {"data": data, "ai_comment": "Bearguard AI Çevrimdışı. Ama bahanelere yer yok, setleri doldur!"}
+        return {"data": data, "ai_comment": "Bearguard AI Çevrimdışı. Ama bahanelere yer yok!"}
     
 @app.post("/api/profile")
 def update_profile(data: ProfileUpdate, session: Session = Depends(get_session), current_user: models.User = Depends(get_current_user)):

@@ -519,7 +519,7 @@ export default function NutritionPage() {
                 {/* ŞİFREMİ UNUTTUM LİNKİ SADECE GİRİŞ MODUNDA GÖRÜNSÜN */}
                 {authMode === "login" && (
                   <button type="button" onClick={() => {setAuthMode("forgotPassword"); setAuthError(""); setAuthSuccess("");}} className="absolute right-2 top-0 text-[9px] font-black text-zinc-500 hover:text-yellow-500 uppercase tracking-widest transition-colors p-2">
-                    ŞİFREMİ UNUTTUM?
+                    ŞİFREMİ UNUTTUM
                   </button>
                 )}
               </div>
