@@ -10,11 +10,13 @@ export default function NutritionPage() {
   // --- AUTH (GÜVENLİK) STATE'LERİ ---
   const [token, setToken] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(true); 
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  // YENİ EKLENDİ: "forgotPassword" modu
+  const [authMode, setAuthMode] = useState<"login" | "register" | "forgotPassword">("login");
   const [authUsername, setAuthUsername] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [authSuccess, setAuthSuccess] = useState(""); // YENİ EKLENDİ: Yeşil başarı mesajı için
   const [authLoading, setAuthLoading] = useState(false);
 
   const [foods, setFoods] = useState<any[]>([]);
@@ -76,11 +78,12 @@ export default function NutritionPage() {
   };
 
   // ==========================================
-  // AUTH (GİRİŞ VE KAYIT) İŞLEMLERİ
+  // AUTH (GİRİŞ, KAYIT VE ŞİFRE SIFIRLAMA)
   // ==========================================
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
+    setAuthSuccess("");
     setAuthLoading(true);
     try {
       const res = await fetch(`${API_BASE}/register`, {
@@ -91,8 +94,8 @@ export default function NutritionPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Kayıt başarısız.");
       
-      alert("Kayıt Başarılı! Şimdi giriş yapabilirsin.");
-      setAuthMode("login");
+      setAuthSuccess("Kayıt Başarılı! Şimdi giriş yapabilirsin.");
+      setTimeout(() => { setAuthMode("login"); setAuthSuccess(""); }, 2000);
     } catch (err: any) {
       setAuthError(err.message);
     } finally {
@@ -103,6 +106,7 @@ export default function NutritionPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
+    setAuthSuccess("");
     setAuthLoading(true);
     try {
       const formData = new URLSearchParams();
@@ -128,6 +132,31 @@ export default function NutritionPage() {
       setAuthLoading(false);
     }
   };
+
+  // --- YENİ EKLENDİ: DEMO ŞİFRE SIFIRLAMA FONKSİYONU ---
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError("");
+    setAuthSuccess("");
+    setAuthLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/reset-demo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: authUsername })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Sıfırlama başarısız.");
+      
+      setAuthSuccess(`Sistem Onayı! Geçici şifreniz: ${data.temp_password}`);
+      setTimeout(() => { setAuthMode("login"); setAuthSuccess(""); }, 5000);
+    } catch (err: any) {
+      setAuthError(err.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+  // ---------------------------------------------------
 
   const handleLogout = () => {
     localStorage.removeItem("bearToken");
@@ -437,23 +466,43 @@ export default function NutritionPage() {
             <p className="text-zinc-500 text-xs uppercase tracking-widest font-bold mt-2">Bearguard Security Protocol</p>
           </div>
 
+          {/* GİRİŞ VE KAYIT SEKMELERİ */}
           <div className="flex gap-2 mb-8 bg-black/50 p-1 rounded-2xl border border-zinc-800">
-            <button onClick={() => setAuthMode("login")} className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-xl transition-all ${authMode === "login" ? "bg-yellow-500 text-black shadow-md" : "text-zinc-500 hover:text-zinc-300"}`}>GİRİŞ YAP</button>
-            <button onClick={() => setAuthMode("register")} className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-xl transition-all ${authMode === "register" ? "bg-yellow-500 text-black shadow-md" : "text-zinc-500 hover:text-zinc-300"}`}>KAYIT OL</button>
+            <button onClick={() => {setAuthMode("login"); setAuthError(""); setAuthSuccess("");}} className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-xl transition-all ${authMode === "login" ? "bg-yellow-500 text-black shadow-md" : "text-zinc-500 hover:text-zinc-300"}`}>GİRİŞ YAP</button>
+            <button onClick={() => {setAuthMode("register"); setAuthError(""); setAuthSuccess("");}} className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-xl transition-all ${authMode === "register" ? "bg-yellow-500 text-black shadow-md" : "text-zinc-500 hover:text-zinc-300"}`}>KAYIT OL</button>
           </div>
 
+          {/* HATA VEYA BAŞARI MESAJLARI */}
           {authError && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-center">
               <p className="text-red-400 text-xs font-bold uppercase tracking-wider">{authError}</p>
             </div>
           )}
+          {authSuccess && (
+            <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-xl text-center">
+              <p className="text-green-400 text-xs font-bold uppercase tracking-wider">{authSuccess}</p>
+            </div>
+          )}
 
-          <form onSubmit={authMode === "login" ? handleLogin : handleRegister} className="space-y-5">
+          <form onSubmit={
+            authMode === "login" ? handleLogin : 
+            authMode === "register" ? handleRegister : 
+            handleForgotPassword
+          } className="space-y-5">
+            
+            {/* HER MODDA KULLANICI ADI İSTENİYOR */}
             <div>
               <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">Kullanıcı Adı</label>
               <input type="text" required value={authUsername} onChange={(e) => setAuthUsername(e.target.value.replace(/\s/g, ""))} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="bear_furkan" />
+              
+              {authMode === "forgotPassword" && (
+                <p className="text-[10px] text-zinc-500 mt-2 font-bold uppercase tracking-widest">
+                  Not: Sistem geçici bir şifre üretecektir.
+                </p>
+              )}
             </div>
 
+            {/* KAYIT MODUNDA E-POSTA İSTENİYOR */}
             {authMode === "register" && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">E-Posta</label>
@@ -461,14 +510,36 @@ export default function NutritionPage() {
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">Şifre</label>
-              <input type="password" required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="••••••••" />
-            </div>
+            {/* ŞİFRE KUTUSU (ŞİFRE SIFIRLAMA MODUNDA GİZLENİR) */}
+            {authMode !== "forgotPassword" && (
+              <div className="relative">
+                <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">Şifre</label>
+                <input type="password" required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="••••••••" />
+                
+                {/* ŞİFREMİ UNUTTUM LİNKİ SADECE GİRİŞ MODUNDA GÖRÜNSÜN */}
+                {authMode === "login" && (
+                  <button type="button" onClick={() => {setAuthMode("forgotPassword"); setAuthError(""); setAuthSuccess("");}} className="absolute right-2 top-0 text-[9px] font-black text-zinc-500 hover:text-yellow-500 uppercase tracking-widest transition-colors p-2">
+                    ŞİFREMİ UNUTTUM?
+                  </button>
+                )}
+              </div>
+            )}
 
+            {/* DİNAMİK GÖNDER BUTONU */}
             <button type="submit" disabled={authLoading} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black py-4 rounded-2xl transition-all shadow-xl mt-4 text-sm uppercase tracking-widest">
-              {authLoading ? "İŞLENİYOR..." : (authMode === "login" ? "SİSTEME GİRİŞ YAP" : "BEARGUARD'A KATIL")}
+              {authLoading ? "İŞLENİYOR..." : 
+               (authMode === "login" ? "SİSTEME GİRİŞ YAP" : 
+                authMode === "register" ? "BEARGUARD'A KATIL" : 
+                "ŞİFREYİ SIFIRLA")}
             </button>
+
+            {/* SIFIRLAMA MODUNDAN GERİ DÖNÜŞ BUTONU */}
+            {authMode === "forgotPassword" && (
+              <button type="button" onClick={() => setAuthMode("login")} className="w-full text-zinc-500 hover:text-white text-xs font-bold tracking-widest uppercase transition-colors pt-2">
+                ← GİRİŞ EKRANINA DÖN
+              </button>
+            )}
+
           </form>
         </div>
       </main>
@@ -844,5 +915,5 @@ export default function NutritionPage() {
         </div>
       )}
     </main>
-  );
+  ); 
 }

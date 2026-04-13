@@ -38,6 +38,11 @@ class UserRegister(BaseModel):
     email: str
     password: str
 
+# --- YENİ EKLENEN: Şifre Sıfırlama Veri Modeli ---
+class ResetRequest(BaseModel):
+    username: str
+# -------------------------------------------------
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -111,6 +116,30 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), ses
     access_token = bear_auth.create_access_token(data={"sub": user.username}) 
     return {"access_token": access_token, "token_type": "bearer"}
 
+# --- YENİ EKLENEN: DEMO ŞİFRE SIFIRLAMA UCU ---
+@app.post("/api/auth/reset-demo")
+def reset_password_demo(request: ResetRequest, session: Session = Depends(get_session)):
+    # 1. Kullanıcıyı bul
+    user = AuthRepository.get_user_by_username(session, request.username)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+    
+    # 2. Geçici şifreyi belirle ve hashle
+    temp_password = "BearGuard2026"
+    hashed_pw = bear_auth.get_password_hash(temp_password)
+    
+    # 3. Veritabanını güncelle
+    user.hashed_password = hashed_pw
+    session.add(user)
+    session.commit()
+    
+    return {
+        "success": True, 
+        "message": "Demo Modu: Şifre sıfırlandı.", 
+        "temp_password": temp_password
+    }
+# ----------------------------------------------
 
 @app.get("/api/food/")
 def get_all_foods(session: Session = Depends(get_session), current_user: models.User = Depends(get_current_user)):
@@ -222,5 +251,4 @@ def update_profile(data: ProfileUpdate, session: Session = Depends(get_session),
 
 @app.get("/api/profile")
 def get_profile(current_user: models.User = Depends(get_current_user)):
-
     return current_user
