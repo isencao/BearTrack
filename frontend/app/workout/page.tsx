@@ -10,13 +10,22 @@ export default function WorkoutPage() {
   // --- SABİT API URL'Sİ (BEARGUARD GÜVENLİĞİ) ---
   const API_BASE = "https://beartrack.onrender.com";
   
-  // --- AUTH (TOKEN) DURUMU ---
+  // --- AUTH (TOKEN) DURUMU VE GÜVENLİK KİLİDİ ---
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
+    // 1. Token'ı al
     const savedToken = localStorage.getItem("bearToken");
-    if (savedToken) setToken(savedToken);
-  }, []);
+    
+    // 2. KONTROL: Token yoksa direkt ana sayfaya (giriş ekranına) şutla!
+    if (!savedToken) {
+      router.push("/"); 
+      return; 
+    }
+
+    // 3. Token varsa sisteme kabul et
+    setToken(savedToken);
+  }, [router]);
 
   const authHeaders = { 
     "Content-Type": "application/json",
