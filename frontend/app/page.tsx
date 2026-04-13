@@ -45,6 +45,22 @@ export default function Home() {
     window.location.reload();
   };
 
+  // --- YENİ EKLENEN GÜVENLİK KİLİDİ FONKSİYONU ---
+  const handleBearIronClick = (e: React.MouseEvent) => {
+    e.preventDefault(); // Varsayılan tıklama davranışını (linke gitmeyi) durdur
+    
+    const token = localStorage.getItem("bearToken");
+    
+    if (!token) {
+      // Bilet yoksa giriş ekranına şutla
+      router.push("/nutrition"); 
+    } else {
+      // Bilet varsa BearIron'a (Sahaya) gönder
+      router.push("/workout"); 
+    }
+  };
+  // ------------------------------------------------
+
   const goalMap: Record<string, string> = { 
     cut: "DEFİNASYON", 
     bulk: "HACİM (BULK)", 
@@ -57,7 +73,6 @@ export default function Home() {
     : 0;
 
   return (
-    // Mobilde kenar boşlukları (p-3) azaltıldı ki widgetlara yer açılsın
     <main className="min-h-screen bg-black text-zinc-100 p-3 md:p-16 font-sans selection:bg-yellow-500 selection:text-black overflow-x-hidden">
       <div className="max-w-6xl mx-auto">
         
@@ -85,13 +100,12 @@ export default function Home() {
           </div>
         </header>
 
-        {/* ANA GRID SİSTEMİ - MOBİLDE 2 KOLON (BENTO BOX), MASAÜSTÜNDE 3 KOLON */}
+        {/* ANA GRID SİSTEMİ */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
           
-          {/* BEARTRACK (BESLENME) KARTI - Mobilde de 2 kolonu kaplar ama daha incedir */}
+          {/* BEARTRACK (BESLENME) KARTI */}
           <Link href="/nutrition" className="col-span-2 md:col-span-2 group">
             <div className="h-full bg-zinc-900/30 border border-zinc-800 rounded-[1.2rem] md:rounded-[2.5rem] p-5 md:p-12 transition-all duration-500 hover:bg-zinc-900/60 hover:border-yellow-500/30 hover:shadow-[0_0_50px_rgba(234,179,8,0.1)] relative overflow-hidden flex flex-col justify-center">
-              {/* Arka plan emojisi mobilde küçültüldü */}
               <div className="absolute -right-2 -bottom-2 md:-right-10 md:-bottom-10 opacity-5 group-hover:opacity-10 transition-opacity duration-500 text-6xl md:text-[15rem] leading-none pointer-events-none">🍽️</div>
               <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white mb-1 md:mb-3">
                 BEAR<span className="text-yellow-500">TRACK</span>
@@ -105,7 +119,7 @@ export default function Home() {
             </div>
           </Link>
 
-          {/* VÜCUT PROFİLİ KARTI - Mobilde 1 kolon (Yan yana widget) */}
+          {/* VÜCUT PROFİLİ KARTI */}
           <div className="col-span-1 md:col-span-1 bg-zinc-900/30 border border-zinc-800 rounded-[1.2rem] md:rounded-[2.5rem] p-4 md:p-8 relative overflow-hidden flex flex-col">
             <h3 className="text-[9px] md:text-xs font-black text-zinc-500 uppercase tracking-widest mb-4 md:mb-8 flex items-center gap-1.5">
               <span>📊</span> PROFİL
@@ -113,7 +127,6 @@ export default function Home() {
             
             {isConnected && profileData?.weight ? (
               <div className="space-y-3 md:space-y-6 flex-1 flex flex-col justify-center">
-                {/* Mobilde yazılar dar alana sığsın diye alt alta, masaüstünde yan yana */}
                 <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center border-b border-zinc-800/50 pb-2 md:pb-4 gap-1 md:gap-0">
                   <span className="text-[9px] md:text-sm font-bold text-zinc-400">Hedef</span>
                   <span className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-1.5 py-0.5 md:px-3 md:py-1 rounded text-[8px] md:text-[10px] font-black uppercase tracking-widest">{displayGoal}</span>
@@ -139,7 +152,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* HESAP MERKEZİ KARTI - Mobilde 1 kolon (Vücut profili ile yan yana) */}
+          {/* HESAP MERKEZİ KARTI */}
           <div className="col-span-1 md:col-span-1 bg-zinc-900/30 border border-zinc-800 rounded-[1.2rem] md:rounded-[2.5rem] p-4 md:p-8 flex flex-col items-center justify-center text-center group transition-all hover:border-zinc-700 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-t from-red-900/5 to-transparent opacity-0 group-hover:opacity-100 transition-all"></div>
             
@@ -165,8 +178,8 @@ export default function Home() {
             )}
           </div>
 
-          {/* BEARIRON (ANTRENMAN) KARTI - Mobilde 2 kolon kaplar */}
-          <Link href="/workout" className="col-span-2 md:col-span-2 group">
+          {/* BEARIRON (ANTRENMAN) KARTI - Link etiketi DIV'e çevrildi ve onClick eklendi */}
+          <div onClick={handleBearIronClick} className="col-span-2 md:col-span-2 group cursor-pointer">
             <div className="h-full bg-zinc-900/30 border border-zinc-800 rounded-[1.2rem] md:rounded-[2.5rem] p-5 md:p-12 transition-all duration-500 hover:bg-zinc-900/60 hover:border-red-600/30 hover:shadow-[0_0_50px_rgba(220,38,38,0.1)] relative overflow-hidden flex flex-col justify-center">
               <div className="absolute -right-2 -bottom-2 md:-right-10 md:-bottom-10 opacity-5 group-hover:opacity-10 transition-opacity duration-500 text-6xl md:text-[15rem] leading-none pointer-events-none">🏋️‍♂️</div>
               <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white mb-1 md:mb-3">
@@ -184,7 +197,7 @@ export default function Home() {
                 SAHAYA İN <span className="text-[10px] md:text-lg">→</span>
               </div>
             </div>
-          </Link>
+          </div>
 
         </div>
       </div>
