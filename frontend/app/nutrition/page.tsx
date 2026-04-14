@@ -5,19 +5,24 @@ import { useRouter } from "next/navigation";
 
 export default function NutritionPage() {
   const router = useRouter();
-  const API_BASE = "https://beartrack.onrender.com";
+  const API_BASE = "https://beartrack.onrender.com"; // (Eğer localde test ediyorsan http://localhost:8000 yapmayı unutma)
 
   // --- AUTH (GÜVENLİK) STATE'LERİ ---
   const [token, setToken] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(true); 
-  // YENİ EKLENDİ: "forgotPassword" modu
   const [authMode, setAuthMode] = useState<"login" | "register" | "forgotPassword">("login");
   const [authUsername, setAuthUsername] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState("");
-  const [authSuccess, setAuthSuccess] = useState(""); // YENİ EKLENDİ: Yeşil başarı mesajı için
+  const [authSuccess, setAuthSuccess] = useState(""); 
   const [authLoading, setAuthLoading] = useState(false);
+
+  // --- ŞİFRE DEĞİŞTİRME STATE'LERİ (YENİ) ---
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordChangeMessage, setPasswordChangeMessage] = useState({ text: "", type: "" });
+  const [isPasswordChanging, setIsPasswordChanging] = useState(false);
 
   const [foods, setFoods] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -133,7 +138,6 @@ export default function NutritionPage() {
     }
   };
 
-  // --- YENİ EKLENDİ: DEMO ŞİFRE SIFIRLAMA FONKSİYONU ---
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -149,14 +153,13 @@ export default function NutritionPage() {
       if (!res.ok) throw new Error(data.detail || "Sıfırlama başarısız.");
       
       setAuthSuccess(`Sistem Onayı! Geçici şifreniz: ${data.temp_password}`);
-      setTimeout(() => { setAuthMode("login"); setAuthSuccess(""); }, 5000);
+      setTimeout(() => { setAuthMode("login"); setAuthSuccess(""); }, 8000); // Kullanıcı şifreyi okusun diye süreyi uzattım
     } catch (err: any) {
       setAuthError(err.message);
     } finally {
       setAuthLoading(false);
     }
   };
-  // ---------------------------------------------------
 
   const handleLogout = () => {
     localStorage.removeItem("bearToken");
@@ -183,16 +186,46 @@ export default function NutritionPage() {
     "Authorization": `Bearer ${token}` 
   };
 
+  // --- YENİ EKLENEN: ŞİFRE DEĞİŞTİRME FONKSİYONU ---
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setIsPasswordChanging(true);
+    setPasswordChangeMessage({ text: "", type: "" });
+
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/change-password`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          old_password: oldPassword,
+          new_password: newPassword
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Şifre güncellenemedi.");
+
+      setPasswordChangeMessage({ text: data.message || "Şifre başarıyla güncellendi!", type: "success" });
+      setOldPassword("");
+      setNewPassword("");
+      
+      // Mesajı 5 saniye sonra temizle
+      setTimeout(() => setPasswordChangeMessage({ text: "", type: "" }), 5000);
+    } catch (err: any) {
+      setPasswordChangeMessage({ text: err.message, type: "error" });
+    } finally {
+      setIsPasswordChanging(false);
+    }
+  };
+  // ------------------------------------------------
+
   const fetchProfile = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/profile`, { headers: authHeaders });
       if (res.ok) {
         const data = await res.json();
-        
-        if (data.username) {
-          setUsername(data.username);
-        }
-
+        if (data.username) setUsername(data.username);
         if (data.weight) {
           setProfile({
             weight: data.weight,
@@ -466,13 +499,11 @@ export default function NutritionPage() {
             <p className="text-zinc-500 text-xs uppercase tracking-widest font-bold mt-2">Bearguard Security Protocol</p>
           </div>
 
-          {/* GİRİŞ VE KAYIT SEKMELERİ */}
           <div className="flex gap-2 mb-8 bg-black/50 p-1 rounded-2xl border border-zinc-800">
             <button onClick={() => {setAuthMode("login"); setAuthError(""); setAuthSuccess("");}} className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-xl transition-all ${authMode === "login" ? "bg-yellow-500 text-black shadow-md" : "text-zinc-500 hover:text-zinc-300"}`}>GİRİŞ YAP</button>
             <button onClick={() => {setAuthMode("register"); setAuthError(""); setAuthSuccess("");}} className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-xl transition-all ${authMode === "register" ? "bg-yellow-500 text-black shadow-md" : "text-zinc-500 hover:text-zinc-300"}`}>KAYIT OL</button>
           </div>
 
-          {/* HATA VEYA BAŞARI MESAJLARI */}
           {authError && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-center">
               <p className="text-red-400 text-xs font-bold uppercase tracking-wider">{authError}</p>
@@ -490,7 +521,6 @@ export default function NutritionPage() {
             handleForgotPassword
           } className="space-y-5">
             
-            {/* HER MODDA KULLANICI ADI İSTENİYOR */}
             <div>
               <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">Kullanıcı Adı</label>
               <input type="text" required value={authUsername} onChange={(e) => setAuthUsername(e.target.value.replace(/\s/g, ""))} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="bear_furkan" />
@@ -502,7 +532,6 @@ export default function NutritionPage() {
               )}
             </div>
 
-            {/* KAYIT MODUNDA E-POSTA İSTENİYOR */}
             {authMode === "register" && (
               <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">E-Posta</label>
@@ -510,22 +539,19 @@ export default function NutritionPage() {
               </div>
             )}
 
-            {/* ŞİFRE KUTUSU (ŞİFRE SIFIRLAMA MODUNDA GİZLENİR) */}
             {authMode !== "forgotPassword" && (
               <div className="relative">
                 <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">Şifre</label>
                 <input type="password" required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="••••••••" />
                 
-                {/* ŞİFREMİ UNUTTUM LİNKİ SADECE GİRİŞ MODUNDA GÖRÜNSÜN */}
                 {authMode === "login" && (
                   <button type="button" onClick={() => {setAuthMode("forgotPassword"); setAuthError(""); setAuthSuccess("");}} className="absolute right-2 top-0 text-[9px] font-black text-zinc-500 hover:text-yellow-500 uppercase tracking-widest transition-colors p-2">
-                    ŞİFREMİ UNUTTUM
+                    ŞİFREMİ UNUTTUM?
                   </button>
                 )}
               </div>
             )}
 
-            {/* DİNAMİK GÖNDER BUTONU */}
             <button type="submit" disabled={authLoading} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black py-4 rounded-2xl transition-all shadow-xl mt-4 text-sm uppercase tracking-widest">
               {authLoading ? "İŞLENİYOR..." : 
                (authMode === "login" ? "SİSTEME GİRİŞ YAP" : 
@@ -533,7 +559,6 @@ export default function NutritionPage() {
                 "ŞİFREYİ SIFIRLA")}
             </button>
 
-            {/* SIFIRLAMA MODUNDAN GERİ DÖNÜŞ BUTONU */}
             {authMode === "forgotPassword" && (
               <button type="button" onClick={() => setAuthMode("login")} className="w-full text-zinc-500 hover:text-white text-xs font-bold tracking-widest uppercase transition-colors pt-2">
                 ← GİRİŞ EKRANINA DÖN
@@ -818,15 +843,17 @@ export default function NutritionPage() {
         </div>
       )}
 
-      {/* KALİBRASYON MODALI */}
+      {/* KALİBRASYON & PROFİL MODALI */}
       {isProfileOpen && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[100] backdrop-blur-md print:hidden">
-          <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-10 w-full max-w-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row gap-8">
-            <div className="flex-1">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-8 md:p-10 w-full max-w-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row gap-8">
+            
+            <div className="flex-1 overflow-y-auto max-h-[75vh] pr-2 [&::-webkit-scrollbar]:hidden">
               <div className="flex justify-between items-center mb-8">
                 <h3 className="text-3xl font-black text-white italic">SİSTEM <span className="text-yellow-500">KALİBRASYONU</span></h3>
                 <button onClick={() => setIsProfileOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl md:hidden">×</button>
               </div>
+              
               <form onSubmit={saveProfile} className="space-y-5">
                 <div className="grid grid-cols-2 gap-5">
                   <div>
@@ -859,10 +886,40 @@ export default function NutritionPage() {
                     <option value={1.725}>Ağır Egzersiz (6-7 gün)</option>
                   </select>
                 </div>
-                <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl mt-4">KALİBRASYONU ONAYLA</button>
+                <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl mt-4 transition-colors">KALİBRASYONU ONAYLA</button>
               </form>
+
+              {/* --- YENİ EKLENEN: ŞİFRE DEĞİŞTİRME BÖLÜMÜ --- */}
+              <div className="mt-8 pt-8 border-t border-zinc-800/80">
+                <h4 className="text-lg font-black text-white italic mb-4">GÜVENLİK <span className="text-red-500">AYARLARI</span></h4>
+                <form onSubmit={handlePasswordChange} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Mevcut Şifre</label>
+                      <input type="password" required value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-red-500 focus:outline-none" placeholder="••••••••" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Yeni Şifre</label>
+                      <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-red-500 focus:outline-none" placeholder="••••••••" />
+                    </div>
+                  </div>
+                  
+                  {passwordChangeMessage.text && (
+                    <div className={`p-3 rounded-xl text-xs font-bold uppercase tracking-wider text-center ${passwordChangeMessage.type === 'error' ? 'bg-red-500/10 text-red-500 border border-red-500/30' : 'bg-green-500/10 text-green-500 border border-green-500/30'}`}>
+                      {passwordChangeMessage.text}
+                    </div>
+                  )}
+
+                  <button type="submit" disabled={isPasswordChanging} className="w-full bg-zinc-800 hover:bg-red-600 disabled:bg-zinc-900 disabled:text-zinc-600 border border-zinc-700 hover:border-red-500 text-white font-black py-3 rounded-xl transition-all uppercase tracking-widest text-sm">
+                    {isPasswordChanging ? "GÜNCELLENİYOR..." : "ŞİFREYİ DEĞİŞTİR"}
+                  </button>
+                </form>
+              </div>
+              {/* ------------------------------------------- */}
+
             </div>
-            <div className="w-full md:w-64 bg-black/50 rounded-2xl p-6 border border-zinc-800 flex flex-col justify-center relative">
+
+            <div className="w-full md:w-64 bg-black/50 rounded-2xl p-6 border border-zinc-800 flex flex-col justify-start relative mt-4 md:mt-0">
               <div className="absolute top-0 right-0 p-4"><button onClick={() => setIsProfileOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl hidden md:block">×</button></div>
               <h4 className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-6 border-b border-zinc-800 pb-2">CANLI HESAPLAMA</h4>
               <div className="space-y-4">

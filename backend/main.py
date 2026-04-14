@@ -4,8 +4,8 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlmodel import Session
 import os
 import json
-import secrets  # Rastgele şifre için eklendi
-import string   # Karakter setleri için eklendi
+import secrets
+import string
 from groq import Groq
 from dotenv import load_dotenv
 from typing import List
@@ -42,6 +42,12 @@ class UserRegister(BaseModel):
 
 class ResetRequest(BaseModel):
     username: str
+
+# --- YENİ EKLENEN: Şifre Değiştirme Modeli ---
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+# ---------------------------------------------
 
 app.add_middleware(
     CORSMiddleware,
@@ -115,14 +121,12 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), ses
     access_token = bear_auth.create_access_token(data={"sub": user.username}) 
     return {"access_token": access_token, "token_type": "bearer"}
 
-# --- YENİ EKLENEN: RASTGELE ŞİFRE ÜRETEN DEMO SIFIRLAMA ---
 @app.post("/api/auth/reset-demo")
 def reset_password_demo(request: ResetRequest, session: Session = Depends(get_session)):
     user = AuthRepository.get_user_by_username(session, request.username)
     if not user:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
     
-    # 8 haneli rastgele şifre üretimi
     alphabet = string.ascii_letters + string.digits
     temp_password = ''.join(secrets.choice(alphabet) for i in range(8))
     
@@ -137,6 +141,29 @@ def reset_password_demo(request: ResetRequest, session: Session = Depends(get_se
         "message": "Demo Modu: Şifre rastgele olarak sıfırlandı.", 
         "temp_password": temp_password
     }
+
+# --- YENİ EKLENEN: ŞİFRE DEĞİŞTİRME UCU ---
+@app.post("/api/auth/change-password")
+def change_password(
+    request: ChangePasswordRequest, 
+    session: Session = Depends(get_session), 
+    current_user: models.User = Depends(get_current_user)
+):
+    # 1. Eski şifrenin doğruluğunu kontrol et
+    if not bear_auth.verify_password(request.old_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Mevcut şifreniz yanlış.")
+    
+    # 2. Yeni şifre eskiyle aynı mı kontrol et
+    if request.old_password == request.new_password:
+        raise HTTPException(status_code=400, detail="Yeni şifreniz eskisiyle aynı olamaz.")
+
+    # 3. Şifreyi şifrele ve kaydet
+    current_user.hashed_password = bear_auth.get_password_hash(request.new_password)
+    session.add(current_user)
+    session.commit()
+    
+    return {"status": "success", "message": "Şifreniz başarıyla güncellendi!"}
+# ------------------------------------------
 
 @app.get("/api/food/")
 def get_all_foods(session: Session = Depends(get_session), current_user: models.User = Depends(get_current_user)):
