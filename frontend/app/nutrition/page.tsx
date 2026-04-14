@@ -2,10 +2,14 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link"; 
 import { useRouter } from "next/navigation";
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 export default function NutritionPage() {
   const router = useRouter();
-  const API_BASE = "https://beartrack.onrender.com"; // (Eğer localde test ediyorsan http://localhost:8000 yapmayı unutma)
+  const API_BASE = "https://beartrack.onrender.com"; // Localde isen http://localhost:8000 yapmayı unutma
+  
+  
+  const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 
   // --- AUTH (GÜVENLİK) STATE'LERİ ---
   const [token, setToken] = useState<string | null>(null);
@@ -18,7 +22,7 @@ export default function NutritionPage() {
   const [authSuccess, setAuthSuccess] = useState(""); 
   const [authLoading, setAuthLoading] = useState(false);
 
-  // --- ŞİFRE DEĞİŞTİRME STATE'LERİ (YENİ) ---
+  // --- ŞİFRE DEĞİŞTİRME STATE'LERİ ---
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [passwordChangeMessage, setPasswordChangeMessage] = useState({ text: "", type: "" });
@@ -138,6 +142,34 @@ export default function NutritionPage() {
     }
   };
 
+  // --- YENİ EKLENEN: GOOGLE GİRİŞİ BAŞARILI OLUNCA TETİKLENEN FONKSİYON ---
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    setAuthError("");
+    setAuthLoading(true);
+    try {
+      // Google'dan gelen bileti (token) kendi backendimize gönderiyoruz
+      const res = await fetch(`${API_BASE}/api/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: credentialResponse.credential })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Google girişi başarısız oldu.");
+
+      // Backend onayladı ve bize BearToken verdi, içeri alıyoruz!
+      localStorage.setItem("bearToken", data.access_token);
+      setToken(data.access_token);
+      setIsAuthModalOpen(false);
+      router.push("/");
+    } catch (err: any) {
+      setAuthError(err.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+  // ----------------------------------------------------------------------
+
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -153,7 +185,7 @@ export default function NutritionPage() {
       if (!res.ok) throw new Error(data.detail || "Sıfırlama başarısız.");
       
       setAuthSuccess(`Sistem Onayı! Geçici şifreniz: ${data.temp_password}`);
-      setTimeout(() => { setAuthMode("login"); setAuthSuccess(""); }, 8000); // Kullanıcı şifreyi okusun diye süreyi uzattım
+      setTimeout(() => { setAuthMode("login"); setAuthSuccess(""); }, 8000); 
     } catch (err: any) {
       setAuthError(err.message);
     } finally {
@@ -186,7 +218,6 @@ export default function NutritionPage() {
     "Authorization": `Bearer ${token}` 
   };
 
-  // --- YENİ EKLENEN: ŞİFRE DEĞİŞTİRME FONKSİYONU ---
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
@@ -210,7 +241,6 @@ export default function NutritionPage() {
       setOldPassword("");
       setNewPassword("");
       
-      // Mesajı 5 saniye sonra temizle
       setTimeout(() => setPasswordChangeMessage({ text: "", type: "" }), 5000);
     } catch (err: any) {
       setPasswordChangeMessage({ text: err.message, type: "error" });
@@ -218,7 +248,6 @@ export default function NutritionPage() {
       setIsPasswordChanging(false);
     }
   };
-  // ------------------------------------------------
 
   const fetchProfile = async () => {
     try {
@@ -487,490 +516,508 @@ export default function NutritionPage() {
 
   if (isAuthModalOpen) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden font-sans">
-        <div className="absolute w-full h-full bg-gradient-to-br from-yellow-500/10 to-black z-0 pointer-events-none"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-yellow-500/20 blur-[150px] pointer-events-none"></div>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <main className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden font-sans">
+          <div className="absolute w-full h-full bg-gradient-to-br from-yellow-500/10 to-black z-0 pointer-events-none"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-yellow-500/20 blur-[150px] pointer-events-none"></div>
 
-        <div className="bg-zinc-900/80 backdrop-blur-2xl border border-zinc-800 rounded-[3rem] p-10 w-full max-w-md z-10 shadow-2xl">
-          <div className="text-center mb-10">
-            <h1 className="text-5xl font-black italic tracking-tighter text-white">
-              BEAR<span className="text-yellow-500">TRACK</span>
-            </h1>
-            <p className="text-zinc-500 text-xs uppercase tracking-widest font-bold mt-2">Bearguard Security Protocol</p>
-          </div>
-
-          <div className="flex gap-2 mb-8 bg-black/50 p-1 rounded-2xl border border-zinc-800">
-            <button onClick={() => {setAuthMode("login"); setAuthError(""); setAuthSuccess("");}} className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-xl transition-all ${authMode === "login" ? "bg-yellow-500 text-black shadow-md" : "text-zinc-500 hover:text-zinc-300"}`}>GİRİŞ YAP</button>
-            <button onClick={() => {setAuthMode("register"); setAuthError(""); setAuthSuccess("");}} className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-xl transition-all ${authMode === "register" ? "bg-yellow-500 text-black shadow-md" : "text-zinc-500 hover:text-zinc-300"}`}>KAYIT OL</button>
-          </div>
-
-          {authError && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-center">
-              <p className="text-red-400 text-xs font-bold uppercase tracking-wider">{authError}</p>
-            </div>
-          )}
-          {authSuccess && (
-            <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-xl text-center">
-              <p className="text-green-400 text-xs font-bold uppercase tracking-wider">{authSuccess}</p>
-            </div>
-          )}
-
-          <form onSubmit={
-            authMode === "login" ? handleLogin : 
-            authMode === "register" ? handleRegister : 
-            handleForgotPassword
-          } className="space-y-5">
-            
-            <div>
-              <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">Kullanıcı Adı</label>
-              <input type="text" required value={authUsername} onChange={(e) => setAuthUsername(e.target.value.replace(/\s/g, ""))} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="bear_furkan" />
-              
-              {authMode === "forgotPassword" && (
-                <p className="text-[10px] text-zinc-500 mt-2 font-bold uppercase tracking-widest">
-                  Not: Sistem geçici bir şifre üretecektir.
-                </p>
-              )}
+          <div className="bg-zinc-900/80 backdrop-blur-2xl border border-zinc-800 rounded-[3rem] p-10 w-full max-w-md z-10 shadow-2xl">
+            <div className="text-center mb-10">
+              <h1 className="text-5xl font-black italic tracking-tighter text-white">
+                BEAR<span className="text-yellow-500">TRACK</span>
+              </h1>
+              <p className="text-zinc-500 text-xs uppercase tracking-widest font-bold mt-2">Bearguard Security Protocol</p>
             </div>
 
-            {authMode === "register" && (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">E-Posta</label>
-                <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value.replace(/\s/g, ""))} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="furkan@bearguard.com" />
+            <div className="flex gap-2 mb-8 bg-black/50 p-1 rounded-2xl border border-zinc-800">
+              <button onClick={() => {setAuthMode("login"); setAuthError(""); setAuthSuccess("");}} className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-xl transition-all ${authMode === "login" ? "bg-yellow-500 text-black shadow-md" : "text-zinc-500 hover:text-zinc-300"}`}>GİRİŞ YAP</button>
+              <button onClick={() => {setAuthMode("register"); setAuthError(""); setAuthSuccess("");}} className={`flex-1 py-3 text-sm font-black uppercase tracking-widest rounded-xl transition-all ${authMode === "register" ? "bg-yellow-500 text-black shadow-md" : "text-zinc-500 hover:text-zinc-300"}`}>KAYIT OL</button>
+            </div>
+
+            {authError && (
+              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-center">
+                <p className="text-red-400 text-xs font-bold uppercase tracking-wider">{authError}</p>
+              </div>
+            )}
+            {authSuccess && (
+              <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-xl text-center">
+                <p className="text-green-400 text-xs font-bold uppercase tracking-wider">{authSuccess}</p>
               </div>
             )}
 
-            {authMode !== "forgotPassword" && (
-              <div className="relative">
-                <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">Şifre</label>
-                <input type="password" required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="••••••••" />
+            <form onSubmit={
+              authMode === "login" ? handleLogin : 
+              authMode === "register" ? handleRegister : 
+              handleForgotPassword
+            } className="space-y-5">
+              
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">Kullanıcı Adı</label>
+                <input type="text" required value={authUsername} onChange={(e) => setAuthUsername(e.target.value.replace(/\s/g, ""))} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="bear_furkan" />
                 
-                {authMode === "login" && (
-                  <button type="button" onClick={() => {setAuthMode("forgotPassword"); setAuthError(""); setAuthSuccess("");}} className="absolute right-2 top-0 text-[9px] font-black text-zinc-500 hover:text-yellow-500 uppercase tracking-widest transition-colors p-2">
-                    ŞİFREMİ UNUTTUM?
-                  </button>
+                {authMode === "forgotPassword" && (
+                  <p className="text-[10px] text-zinc-500 mt-2 font-bold uppercase tracking-widest">
+                    Not: Sistem geçici bir şifre üretecektir.
+                  </p>
                 )}
               </div>
-            )}
 
-            <button type="submit" disabled={authLoading} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black py-4 rounded-2xl transition-all shadow-xl mt-4 text-sm uppercase tracking-widest">
-              {authLoading ? "İŞLENİYOR..." : 
-               (authMode === "login" ? "SİSTEME GİRİŞ YAP" : 
-                authMode === "register" ? "BEARGUARD'A KATIL" : 
-                "ŞİFREYİ SIFIRLA")}
-            </button>
+              {authMode === "register" && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                  <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">E-Posta</label>
+                  <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value.replace(/\s/g, ""))} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="furkan@bearguard.com" />
+                </div>
+              )}
 
-            {authMode === "forgotPassword" && (
-              <button type="button" onClick={() => setAuthMode("login")} className="w-full text-zinc-500 hover:text-white text-xs font-bold tracking-widest uppercase transition-colors pt-2">
-                ← GİRİŞ EKRANINA DÖN
+              {authMode !== "forgotPassword" && (
+                <div className="relative">
+                  <label className="block text-xs font-bold text-zinc-500 mb-2 uppercase tracking-widest">Şifre</label>
+                  <input type="password" required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-white focus:outline-none focus:border-yellow-500 transition-all font-bold" placeholder="••••••••" />
+                  
+                  {authMode === "login" && (
+                    <button type="button" onClick={() => {setAuthMode("forgotPassword"); setAuthError(""); setAuthSuccess("");}} className="absolute right-2 top-0 text-[9px] font-black text-zinc-500 hover:text-yellow-500 uppercase tracking-widest transition-colors p-2">
+                      ŞİFREMİ UNUTTUM?
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <button type="submit" disabled={authLoading} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black py-4 rounded-2xl transition-all shadow-xl mt-4 text-sm uppercase tracking-widest">
+                {authLoading ? "İŞLENİYOR..." : 
+                (authMode === "login" ? "SİSTEME GİRİŞ YAP" : 
+                  authMode === "register" ? "BEARGUARD'A KATIL" : 
+                  "ŞİFREYİ SIFIRLA")}
               </button>
-            )}
 
-          </form>
-        </div>
-      </main>
+              {authMode === "forgotPassword" && (
+                <button type="button" onClick={() => setAuthMode("login")} className="w-full text-zinc-500 hover:text-white text-xs font-bold tracking-widest uppercase transition-colors pt-2">
+                  ← GİRİŞ EKRANINA DÖN
+                </button>
+              )}
+
+            </form>
+
+            {/* --- YENİ EKLENEN: GOOGLE GİRİŞ BUTONU --- */}
+            {authMode === "login" && (
+              <div className="mt-6 pt-6 border-t border-zinc-800/80">
+                <div className="flex justify-center w-full">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={() => setAuthError("Google ile giriş yapılamadı.")}
+                    theme="filled_black"
+                    shape="pill"
+                    text="continue_with"
+                    width="100%"
+                  />
+                </div>
+              </div>
+            )}
+            {/* --------------------------------------- */}
+
+          </div>
+        </main>
+      </GoogleOAuthProvider>
     );
   }
 
+  // --- BURADAN AŞAĞISI STANDART SAYFA YAPISI, DEĞİŞMEDİ ---
   return (
-    <main className="min-h-screen bg-black text-zinc-100 p-4 md:p-12 font-sans selection:bg-yellow-500 selection:text-black">
-      <div className="max-w-5xl mx-auto print:hidden">
-        
-        {/* --- HEADER --- */}
-        <header className="flex flex-col space-y-6 pb-6 border-b border-zinc-800/50 mb-6">
-          <div className="flex justify-between items-center w-full gap-2">
-            <Link href="/" className="flex-shrink-0">
-              <div className="hover:opacity-80 transition-opacity cursor-pointer">
-                <h1 className="text-3xl md:text-6xl font-black italic tracking-tighter text-white">
-                  BEAR<span className="text-yellow-500">TRACK</span>
-                </h1>
-                <p className="text-zinc-500 font-medium mt-0.5 uppercase tracking-[0.3em] text-[7px] md:text-xs italic">Vanguard System</p>
-              </div>
-            </Link>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <main className="min-h-screen bg-black text-zinc-100 p-4 md:p-12 font-sans selection:bg-yellow-500 selection:text-black">
+        <div className="max-w-5xl mx-auto print:hidden">
+          
+          <header className="flex flex-col space-y-6 pb-6 border-b border-zinc-800/50 mb-6">
+            <div className="flex justify-between items-center w-full gap-2">
+              <Link href="/" className="flex-shrink-0">
+                <div className="hover:opacity-80 transition-opacity cursor-pointer">
+                  <h1 className="text-3xl md:text-6xl font-black italic tracking-tighter text-white">
+                    BEAR<span className="text-yellow-500">TRACK</span>
+                  </h1>
+                  <p className="text-zinc-500 font-medium mt-0.5 uppercase tracking-[0.3em] text-[7px] md:text-xs italic">Vanguard System</p>
+                </div>
+              </Link>
 
-            <div className="flex items-center gap-2 md:gap-4 bg-zinc-900/50 border border-zinc-800/80 px-3 py-2 md:px-6 md:py-3.5 rounded-xl md:rounded-[1.5rem] shadow-inner group transition-all hover:border-yellow-500/40 flex-shrink min-w-0">
-              <div className="relative flex items-center justify-center flex-shrink-0">
-                <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                <div className="absolute inset-0 w-1.5 h-1.5 md:w-2 md:h-2 bg-yellow-500 rounded-full blur-md opacity-60"></div>
-              </div>
-              <div className="flex flex-col text-right min-w-0">
-                <span className="text-[6px] md:text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] leading-none mb-1 md:mb-1.5 truncate">
-                  SİSTEME GİRİŞ YAPILDI
-                </span>
-                <span className="text-[9px] md:text-base text-white font-black uppercase tracking-tighter truncate">
-                  HOŞ GELDİN, <span className="text-yellow-500 group-hover:text-yellow-400 transition-colors">{username}</span>
-                </span>
+              <div className="flex items-center gap-2 md:gap-4 bg-zinc-900/50 border border-zinc-800/80 px-3 py-2 md:px-6 md:py-3.5 rounded-xl md:rounded-[1.5rem] shadow-inner group transition-all hover:border-yellow-500/40 flex-shrink min-w-0">
+                <div className="relative flex items-center justify-center flex-shrink-0">
+                  <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                  <div className="absolute inset-0 w-1.5 h-1.5 md:w-2 md:h-2 bg-yellow-500 rounded-full blur-md opacity-60"></div>
+                </div>
+                <div className="flex flex-col text-right min-w-0">
+                  <span className="text-[6px] md:text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] leading-none mb-1 md:mb-1.5 truncate">
+                    SİSTEME GİRİŞ YAPILDI
+                  </span>
+                  <span className="text-[9px] md:text-base text-white font-black uppercase tracking-tighter truncate">
+                    HOŞ GELDİN, <span className="text-yellow-500 group-hover:text-yellow-400 transition-colors">{username}</span>
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex flex-nowrap items-center gap-3 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            <button onClick={fetchWeeklyReport} disabled={isReportLoading} className="flex-shrink-0 whitespace-nowrap bg-blue-500/10 border border-blue-500/30 text-blue-400 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:bg-blue-500 hover:text-white">
-              {isReportLoading ? "..." : "📊 RAPOR"}
-            </button>
-
-            <Link href="/workout" className="flex-shrink-0 whitespace-nowrap bg-red-500/10 border border-red-500/20 text-red-500 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:bg-red-500 hover:text-white">
-              🏋️ İDMAN
-            </Link>
-
-            <button onClick={() => setIsProfileOpen(true)} className="flex-shrink-0 whitespace-nowrap bg-zinc-900 border border-zinc-700 text-zinc-300 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:border-yellow-500">
-              ⚙️ PROFİL
-            </button>
-            
-            <button onClick={handleLogout} className="flex-shrink-0 whitespace-nowrap bg-zinc-900 border border-red-900/50 text-red-500 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:bg-red-600 hover:text-white">
-              🚪 ÇIKIŞ
-            </button>
-          </div>
-        </header>
-
-        {/* HAFTALIK ŞERİT */}
-        <div className="flex gap-3 mb-10 overflow-x-auto pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] items-center">
-          {weekDays.map((date, idx) => {
-            const isSelected = date.toDateString() === selectedDate.toDateString();
-            const isToday = date.toDateString() === new Date().toDateString();
-            const dayName = date.toLocaleDateString("tr-TR", { weekday: "short" });
-            const dayNumber = date.getDate();
-
-            return (
-              <button
-                key={idx}
-                onClick={() => setSelectedDate(date)}
-                className={`flex flex-col items-center justify-center min-w-[5rem] h-24 rounded-2xl transition-all ${
-                  isSelected
-                    ? "bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.3)] scale-105 z-10"
-                    : "bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:bg-zinc-800"
-                }`}
-              >
-                <span className={`text-xs font-bold uppercase tracking-wider mb-1 ${isSelected ? "text-black/70" : "text-zinc-500"}`}>{dayName}</span>
-                <span className="text-2xl font-black">{dayNumber}</span>
-                {isToday && !isSelected && <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full mt-2"></div>}
+            <div className="flex flex-nowrap items-center gap-3 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <button onClick={fetchWeeklyReport} disabled={isReportLoading} className="flex-shrink-0 whitespace-nowrap bg-blue-500/10 border border-blue-500/30 text-blue-400 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:bg-blue-500 hover:text-white">
+                {isReportLoading ? "..." : "📊 RAPOR"}
               </button>
-            );
-          })}
 
-          <div 
-            onClick={openDatePicker}
-            className={`relative flex flex-col items-center justify-center min-w-[5rem] h-24 rounded-2xl transition-all cursor-pointer overflow-hidden border ${
-              isDateOutsideStrip ? "bg-yellow-500 text-black border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.3)] scale-105 z-10" : "bg-zinc-900/80 border-zinc-700 text-zinc-400 hover:border-yellow-500"
-            }`}
-          >
-            <span className="text-xl mb-1 pointer-events-none">📅</span>
-            <span className={`text-[10px] font-bold uppercase tracking-wider pointer-events-none ${isDateOutsideStrip ? "text-black" : "text-zinc-500"}`}>
-              {isDateOutsideStrip ? `${selectedDate.getDate()}/${selectedDate.getMonth()+1}` : "TÜMÜ"}
-            </span>
-            <input ref={dateInputRef} type="date" onChange={handleDateChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"/>
-          </div>
-        </div>
+              <Link href="/workout" className="flex-shrink-0 whitespace-nowrap bg-red-500/10 border border-red-500/20 text-red-500 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:bg-red-500 hover:text-white">
+                🏋️ İDMAN
+              </Link>
 
-        {/* DASHBOARD GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          <div className="lg:col-span-2 space-y-8">
-            <div className={`bg-zinc-900/50 border ${isCalOver ? 'border-red-900/50' : 'border-zinc-800'} rounded-3xl p-8 backdrop-blur-md shadow-2xl transition-all`}>
-              <div className="flex justify-between items-center mb-10">
-                <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                  <span className={`w-1.5 h-8 ${isCalOver ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'} rounded-full`}></span>
-                  {selectedDate.toDateString() === new Date().toDateString() ? "Günlük Alınan Besin Değerleri" : `${selectedDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} Özeti`}
-                </h2>
-                <button onClick={() => setIsModalOpen(true)} className="bg-yellow-500 hover:bg-yellow-400 text-black font-black py-3 px-6 rounded-2xl transition-all active:scale-95 shadow-[0_0_20px_rgba(234,179,8,0.3)] text-sm">
-                  + ÖĞÜN EKLE
-                </button>
-              </div>
-
-              <div className="grid gap-8 md:grid-cols-2">
-                <div className="space-y-8">
-                  <div>
-                    <div className="flex justify-between items-end mb-3">
-                      <span className="text-zinc-400 font-bold uppercase text-xs tracking-wider">Enerji (kcal)</span>
-                      <span className={`text-2xl font-black ${isCalOver ? 'text-red-500' : 'text-yellow-500'}`}>
-                        {totalCals.toFixed(0)} <span className="text-zinc-600 text-sm">/ {DYNAMIC_CALORIE_GOAL}</span>
-                      </span>
-                    </div>
-                    <div className="h-4 w-full bg-zinc-800/50 rounded-full overflow-hidden border border-zinc-700/50">
-                      <div className={`h-full transition-all duration-1000 ${isCalOver ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 'bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.4)]'}`} style={{ width: `${calWidth}%` }}></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-end mb-3">
-                      <span className="text-zinc-400 font-bold uppercase text-xs tracking-wider">Protein (g)</span>
-                      <span className={`text-2xl font-black ${isProtOver ? 'text-red-500' : 'text-blue-500'}`}>
-                        {totalProt.toFixed(1)} <span className="text-zinc-600 text-sm">/ {PROTEIN_GOAL}</span>
-                      </span>
-                    </div>
-                    <div className="h-4 w-full bg-zinc-800/50 rounded-full overflow-hidden border border-zinc-700/50">
-                      <div className={`h-full transition-all duration-1000 ${isProtOver ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 'bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.4)]'}`} style={{ width: `${protWidth}%` }}></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-8">
-                  <div>
-                    <div className="flex justify-between items-end mb-3">
-                      <span className="text-zinc-400 font-bold uppercase text-xs tracking-wider">Karbonhidrat (g)</span>
-                      <span className={`text-2xl font-black ${isCarbOver ? 'text-red-500' : 'text-emerald-500'}`}>
-                        {totalCarbs.toFixed(1)} <span className="text-zinc-600 text-sm">/ {CARB_GOAL}</span>
-                      </span>
-                    </div>
-                    <div className="h-4 w-full bg-zinc-800/50 rounded-full overflow-hidden border border-zinc-700/50">
-                      <div className={`h-full transition-all duration-1000 ${isCarbOver ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]'}`} style={{ width: `${carbWidth}%` }}></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-end mb-3">
-                      <span className="text-zinc-400 font-bold uppercase text-xs tracking-wider">Yağ (g)</span>
-                      <span className={`text-2xl font-black ${isFatOver ? 'text-red-500' : 'text-orange-500'}`}>
-                        {totalFats.toFixed(1)} <span className="text-zinc-600 text-sm">/ {FAT_GOAL}</span>
-                      </span>
-                    </div>
-                    <div className="h-4 w-full bg-zinc-800/50 rounded-full overflow-hidden border border-zinc-700/50">
-                      <div className={`h-full transition-all duration-1000 ${isFatOver ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)]'}`} style={{ width: `${fatWidth}%` }}></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 backdrop-blur-md shadow-2xl relative overflow-hidden transition-all">
-              <div className="absolute -right-10 -top-10 w-40 h-40 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
-              <div className="flex justify-between items-end mb-6 relative z-10">
-                <div>
-                  <h2 className="text-2xl font-bold text-white flex items-center gap-3 mb-2"><span className="w-1.5 h-8 bg-cyan-500 rounded-full"></span>Hidrasyon</h2>
-                  <p className="text-zinc-400 text-sm">Günlük Su Tüketimi</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-3xl font-black text-cyan-400">{waterIntake} <span className="text-lg text-zinc-500 font-bold">/ {WATER_GOAL} ml</span></span>
-                </div>
-              </div>
-              <div className="h-6 w-full bg-zinc-800/80 rounded-full overflow-hidden border border-zinc-700/50 mb-8 relative z-10 p-1">
-                <div className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full transition-all duration-1000 shadow-[0_0_20px_rgba(34,211,238,0.3)] relative overflow-hidden" style={{ width: `${waterWidth}%` }}>
-                   <div className="absolute inset-0 bg-white/20 w-full h-full animate-[wave_2s_linear_infinite] skew-x-12 transform -translate-x-full"></div>
-                </div>
-              </div>
-              <div className="flex flex-col gap-3 relative z-10 animate-fade-in">
-                <div className="flex gap-4">
-                  <button onClick={() => addWater(250)} className="flex-1 bg-zinc-800 hover:bg-cyan-900/50 border border-zinc-700 hover:border-cyan-500 text-cyan-400 font-bold py-4 rounded-2xl transition-all shadow-lg">+ 250 ml</button>
-                  <button onClick={() => addWater(500)} className="flex-1 bg-zinc-800 hover:bg-cyan-900/50 border border-zinc-700 hover:border-cyan-500 text-cyan-400 font-bold py-4 rounded-2xl transition-all shadow-lg">+ 500 ml</button>
-                </div>
-                <div className="flex gap-4">
-                  <button onClick={() => addWater(-250)} className="flex-1 bg-zinc-900/80 hover:bg-red-900/20 border border-zinc-800/50 hover:border-red-500/50 text-zinc-500 hover:text-red-400 font-bold py-2 rounded-xl transition-all text-xs">- 250 ml</button>
-                  <button onClick={() => addWater(-500)} className="flex-1 bg-zinc-900/80 hover:bg-red-900/20 border border-zinc-800/50 hover:border-red-500/50 text-zinc-500 hover:text-red-400 font-bold py-2 rounded-xl transition-all text-xs">- 500 ml</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 backdrop-blur-md flex flex-col h-full min-h-[500px]">
-            <h2 className="text-xl font-bold text-white mb-6">Tüketilenler Listesi</h2>
-            <div className="space-y-4 overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-4">
-              {displayedFoods.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-zinc-600 opacity-50">
-                  <span className="text-4xl mb-3">🍽️</span>
-                  <p className="text-sm italic text-center">Bu tarihte hiç öğün kaydedilmemiş.</p>
-                </div>
-              ) : (
-                mealCategories.map((category) => {
-                  const foodsInCategory = groupedFoods[category.id];
-                  if (foodsInCategory.length === 0) return null; 
-                  const isExpanded = expandedCategories[category.id];
-                  return (
-                    <div key={category.id} className="last:mb-0 bg-zinc-950/30 rounded-2xl border border-zinc-800/50 overflow-hidden transition-all duration-300">
-                      <div onClick={() => toggleCategory(category.id)} className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-800/40 transition-colors group select-none">
-                        <div className="flex items-center gap-3">
-                          <span className="text-xl">{category.icon}</span>
-                          <h3 className="text-[11px] font-black text-zinc-400 uppercase tracking-widest group-hover:text-yellow-500 transition-colors">{category.title}</h3>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-[10px] font-bold text-zinc-500">{foodsInCategory.length} Öğün</span>
-                          <span className={`text-zinc-500 text-xs transition-transform duration-300 ${isExpanded ? 'rotate-180 text-yellow-500' : ''}`}>▼</span>
-                        </div>
-                      </div>
-                      {isExpanded && (
-                        <div className="p-4 pt-0 space-y-3 border-t border-zinc-800/30 animate-in slide-in-from-top-2 duration-300">
-                          {foodsInCategory.map((food) => (
-                            <div key={food.id} className="relative bg-zinc-800/40 p-4 pr-12 rounded-xl border border-zinc-700/30 flex justify-between items-center group hover:bg-zinc-800/70 hover:border-yellow-500/30 transition-all">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-zinc-200 truncate">{food.cleanName}</p>
-                                <p className="text-[10px] text-zinc-500 uppercase mt-1">{food.protein.toFixed(1)}P • {food.carbs.toFixed(1)}C • {food.fat.toFixed(1)}Y</p>
-                              </div>
-                              <div className="flex items-center flex-shrink-0">
-                                <span className="text-xs font-black text-yellow-500 whitespace-nowrap">{food.calories < 0 ? `🔥 ${Math.abs(food.calories).toFixed(0)}` : food.calories.toFixed(0)} kcal</span>
-                              </div>
-                              <button onClick={(e) => { e.stopPropagation(); handleDelete(food.id); }} className="absolute right-4 text-red-500 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:scale-125 transition-all p-2" title="Öğünü Sil">✖</button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* RAPOR YAZDIRMA MODALI */}
-      {reportData && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm print:bg-white print:block print:inset-auto print:relative print:p-0">
-          <div className="bg-zinc-900 border border-zinc-700 w-full max-w-2xl rounded-3xl p-10 print:bg-white print:text-black print:border-none print:shadow-none print:w-full print:max-w-full">
-            <div className="flex justify-between items-center mb-8 border-b border-zinc-800 pb-6 print:border-gray-200">
-              <div>
-                <h2 className="text-3xl font-black italic tracking-tighter text-white print:text-black">BEAR<span className="text-yellow-500 print:text-black">TRACK</span></h2>
-                <p className="text-xs font-bold tracking-widest uppercase text-zinc-500 mt-1">Haftalık Analiz Raporu</p>
-              </div>
-              <button onClick={() => setReportData(null)} className="text-zinc-500 hover:text-white text-3xl print:hidden">×</button>
-            </div>
-            <div className="space-y-8">
-              <div className="bg-zinc-800/30 border border-zinc-700/50 p-6 rounded-2xl print:bg-gray-50 print:border-gray-300">
-                <h3 className="text-[10px] uppercase tracking-widest font-black text-yellow-500 mb-4 print:text-black">Vanguard Performans Özeti</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div><p className="text-xs text-zinc-400 uppercase tracking-wider mb-1 print:text-gray-500">Antrenman Günü</p><p className="text-2xl font-black text-white print:text-black">{reportData.data.workout_count} Gün</p></div>
-                  <div><p className="text-xs text-zinc-400 uppercase tracking-wider mb-1 print:text-gray-500">Haftalık Toplam Set</p><p className="text-2xl font-black text-blue-500 print:text-black">{reportData.data.total_sets} Set</p></div>
-                  <div><p className="text-xs text-zinc-400 uppercase tracking-wider mb-1 print:text-gray-500">Ort. Günlük Kalori</p><p className="text-2xl font-black text-yellow-500 print:text-black">{reportData.data.avg_kcal} kcal</p></div>
-                  <div><p className="text-xs text-zinc-400 uppercase tracking-wider mb-1 print:text-gray-500">Ort. Günlük Protein</p><p className="text-2xl font-black text-green-500 print:text-black">{reportData.data.avg_protein} g</p></div>
-                </div>
-              </div>
-              <div className="bg-zinc-950 p-6 rounded-2xl border border-zinc-800 print:bg-white print:border-gray-300">
-                <h3 className="text-[10px] uppercase tracking-widest font-black text-red-500 mb-3 flex items-center gap-2 print:text-black"><span className="w-2 h-2 bg-red-500 rounded-full animate-pulse print:hidden"></span>Vanguard Askeri Değerlendirme</h3>
-                <p className="text-sm leading-relaxed text-zinc-300 italic font-medium print:text-black print:not-italic">"{reportData.ai_comment}"</p>
-              </div>
-              <div className="flex justify-end gap-4 mt-8 print:hidden">
-                <button onClick={() => setReportData(null)} className="px-6 py-3 font-bold text-zinc-400 hover:text-white transition-colors">KAPAT</button>
-                <button onClick={handlePrint} className="bg-blue-500 hover:bg-blue-400 text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-widest shadow-lg">🖨️ PDF OLARAK İNDİR</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* KALİBRASYON & PROFİL MODALI */}
-      {isProfileOpen && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[100] backdrop-blur-md print:hidden">
-          <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-8 md:p-10 w-full max-w-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row gap-8">
-            
-            <div className="flex-1 overflow-y-auto max-h-[75vh] pr-2 [&::-webkit-scrollbar]:hidden">
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-3xl font-black text-white italic">SİSTEM <span className="text-yellow-500">KALİBRASYONU</span></h3>
-                <button onClick={() => setIsProfileOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl md:hidden">×</button>
-              </div>
+              <button onClick={() => setIsProfileOpen(true)} className="flex-shrink-0 whitespace-nowrap bg-zinc-900 border border-zinc-700 text-zinc-300 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:border-yellow-500">
+                ⚙️ PROFİL
+              </button>
               
-              <form onSubmit={saveProfile} className="space-y-5">
-                <div className="grid grid-cols-2 gap-5">
+              <button onClick={handleLogout} className="flex-shrink-0 whitespace-nowrap bg-zinc-900 border border-red-900/50 text-red-500 py-3.5 px-6 rounded-2xl transition-all text-xs font-black tracking-widest uppercase flex items-center gap-2 hover:bg-red-600 hover:text-white">
+                🚪 ÇIKIŞ
+              </button>
+            </div>
+          </header>
+
+          <div className="flex gap-3 mb-10 overflow-x-auto pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] items-center">
+            {weekDays.map((date, idx) => {
+              const isSelected = date.toDateString() === selectedDate.toDateString();
+              const isToday = date.toDateString() === new Date().toDateString();
+              const dayName = date.toLocaleDateString("tr-TR", { weekday: "short" });
+              const dayNumber = date.getDate();
+
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedDate(date)}
+                  className={`flex flex-col items-center justify-center min-w-[5rem] h-24 rounded-2xl transition-all ${
+                    isSelected
+                      ? "bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.3)] scale-105 z-10"
+                      : "bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:bg-zinc-800"
+                  }`}
+                >
+                  <span className={`text-xs font-bold uppercase tracking-wider mb-1 ${isSelected ? "text-black/70" : "text-zinc-500"}`}>{dayName}</span>
+                  <span className="text-2xl font-black">{dayNumber}</span>
+                  {isToday && !isSelected && <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full mt-2"></div>}
+                </button>
+              );
+            })}
+
+            <div 
+              onClick={openDatePicker}
+              className={`relative flex flex-col items-center justify-center min-w-[5rem] h-24 rounded-2xl transition-all cursor-pointer overflow-hidden border ${
+                isDateOutsideStrip ? "bg-yellow-500 text-black border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.3)] scale-105 z-10" : "bg-zinc-900/80 border-zinc-700 text-zinc-400 hover:border-yellow-500"
+              }`}
+            >
+              <span className="text-xl mb-1 pointer-events-none">📅</span>
+              <span className={`text-[10px] font-bold uppercase tracking-wider pointer-events-none ${isDateOutsideStrip ? "text-black" : "text-zinc-500"}`}>
+                {isDateOutsideStrip ? `${selectedDate.getDate()}/${selectedDate.getMonth()+1}` : "TÜMÜ"}
+              </span>
+              <input ref={dateInputRef} type="date" onChange={handleDateChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"/>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            <div className="lg:col-span-2 space-y-8">
+              <div className={`bg-zinc-900/50 border ${isCalOver ? 'border-red-900/50' : 'border-zinc-800'} rounded-3xl p-8 backdrop-blur-md shadow-2xl transition-all`}>
+                <div className="flex justify-between items-center mb-10">
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                    <span className={`w-1.5 h-8 ${isCalOver ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'} rounded-full`}></span>
+                    {selectedDate.toDateString() === new Date().toDateString() ? "Günlük Alınan Besin Değerleri" : `${selectedDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} Özeti`}
+                  </h2>
+                  <button onClick={() => setIsModalOpen(true)} className="bg-yellow-500 hover:bg-yellow-400 text-black font-black py-3 px-6 rounded-2xl transition-all active:scale-95 shadow-[0_0_20px_rgba(234,179,8,0.3)] text-sm">
+                    + ÖĞÜN EKLE
+                  </button>
+                </div>
+
+                <div className="grid gap-8 md:grid-cols-2">
+                  <div className="space-y-8">
+                    <div>
+                      <div className="flex justify-between items-end mb-3">
+                        <span className="text-zinc-400 font-bold uppercase text-xs tracking-wider">Enerji (kcal)</span>
+                        <span className={`text-2xl font-black ${isCalOver ? 'text-red-500' : 'text-yellow-500'}`}>
+                          {totalCals.toFixed(0)} <span className="text-zinc-600 text-sm">/ {DYNAMIC_CALORIE_GOAL}</span>
+                        </span>
+                      </div>
+                      <div className="h-4 w-full bg-zinc-800/50 rounded-full overflow-hidden border border-zinc-700/50">
+                        <div className={`h-full transition-all duration-1000 ${isCalOver ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 'bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.4)]'}`} style={{ width: `${calWidth}%` }}></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-end mb-3">
+                        <span className="text-zinc-400 font-bold uppercase text-xs tracking-wider">Protein (g)</span>
+                        <span className={`text-2xl font-black ${isProtOver ? 'text-red-500' : 'text-blue-500'}`}>
+                          {totalProt.toFixed(1)} <span className="text-zinc-600 text-sm">/ {PROTEIN_GOAL}</span>
+                        </span>
+                      </div>
+                      <div className="h-4 w-full bg-zinc-800/50 rounded-full overflow-hidden border border-zinc-700/50">
+                        <div className={`h-full transition-all duration-1000 ${isProtOver ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 'bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.4)]'}`} style={{ width: `${protWidth}%` }}></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-8">
+                    <div>
+                      <div className="flex justify-between items-end mb-3">
+                        <span className="text-zinc-400 font-bold uppercase text-xs tracking-wider">Karbonhidrat (g)</span>
+                        <span className={`text-2xl font-black ${isCarbOver ? 'text-red-500' : 'text-emerald-500'}`}>
+                          {totalCarbs.toFixed(1)} <span className="text-zinc-600 text-sm">/ {CARB_GOAL}</span>
+                        </span>
+                      </div>
+                      <div className="h-4 w-full bg-zinc-800/50 rounded-full overflow-hidden border border-zinc-700/50">
+                        <div className={`h-full transition-all duration-1000 ${isCarbOver ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]'}`} style={{ width: `${carbWidth}%` }}></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-end mb-3">
+                        <span className="text-zinc-400 font-bold uppercase text-xs tracking-wider">Yağ (g)</span>
+                        <span className={`text-2xl font-black ${isFatOver ? 'text-red-500' : 'text-orange-500'}`}>
+                          {totalFats.toFixed(1)} <span className="text-zinc-600 text-sm">/ {FAT_GOAL}</span>
+                        </span>
+                      </div>
+                      <div className="h-4 w-full bg-zinc-800/50 rounded-full overflow-hidden border border-zinc-700/50">
+                        <div className={`h-full transition-all duration-1000 ${isFatOver ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)]'}`} style={{ width: `${fatWidth}%` }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 backdrop-blur-md shadow-2xl relative overflow-hidden transition-all">
+                <div className="absolute -right-10 -top-10 w-40 h-40 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div className="flex justify-between items-end mb-6 relative z-10">
                   <div>
-                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Kilo (kg)</label>
-                    <input type="number" required value={profile.weight} onChange={(e) => setProfile({...profile, weight: e.target.value === "" ? ("" as any) : Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" />
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-3 mb-2"><span className="w-1.5 h-8 bg-cyan-500 rounded-full"></span>Hidrasyon</h2>
+                    <p className="text-zinc-400 text-sm">Günlük Su Tüketimi</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-3xl font-black text-cyan-400">{waterIntake} <span className="text-lg text-zinc-500 font-bold">/ {WATER_GOAL} ml</span></span>
+                  </div>
+                </div>
+                <div className="h-6 w-full bg-zinc-800/80 rounded-full overflow-hidden border border-zinc-700/50 mb-8 relative z-10 p-1">
+                  <div className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full transition-all duration-1000 shadow-[0_0_20px_rgba(34,211,238,0.3)] relative overflow-hidden" style={{ width: `${waterWidth}%` }}>
+                     <div className="absolute inset-0 bg-white/20 w-full h-full animate-[wave_2s_linear_infinite] skew-x-12 transform -translate-x-full"></div>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3 relative z-10 animate-fade-in">
+                  <div className="flex gap-4">
+                    <button onClick={() => addWater(250)} className="flex-1 bg-zinc-800 hover:bg-cyan-900/50 border border-zinc-700 hover:border-cyan-500 text-cyan-400 font-bold py-4 rounded-2xl transition-all shadow-lg">+ 250 ml</button>
+                    <button onClick={() => addWater(500)} className="flex-1 bg-zinc-800 hover:bg-cyan-900/50 border border-zinc-700 hover:border-cyan-500 text-cyan-400 font-bold py-4 rounded-2xl transition-all shadow-lg">+ 500 ml</button>
+                  </div>
+                  <div className="flex gap-4">
+                    <button onClick={() => addWater(-250)} className="flex-1 bg-zinc-900/80 hover:bg-red-900/20 border border-zinc-800/50 hover:border-red-500/50 text-zinc-500 hover:text-red-400 font-bold py-2 rounded-xl transition-all text-xs">- 250 ml</button>
+                    <button onClick={() => addWater(-500)} className="flex-1 bg-zinc-900/80 hover:bg-red-900/20 border border-zinc-800/50 hover:border-red-500/50 text-zinc-500 hover:text-red-400 font-bold py-2 rounded-xl transition-all text-xs">- 500 ml</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 backdrop-blur-md flex flex-col h-full min-h-[500px]">
+              <h2 className="text-xl font-bold text-white mb-6">Tüketilenler Listesi</h2>
+              <div className="space-y-4 overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-4">
+                {displayedFoods.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-zinc-600 opacity-50">
+                    <span className="text-4xl mb-3">🍽️</span>
+                    <p className="text-sm italic text-center">Bu tarihte hiç öğün kaydedilmemiş.</p>
+                  </div>
+                ) : (
+                  mealCategories.map((category) => {
+                    const foodsInCategory = groupedFoods[category.id];
+                    if (foodsInCategory.length === 0) return null; 
+                    const isExpanded = expandedCategories[category.id];
+                    return (
+                      <div key={category.id} className="last:mb-0 bg-zinc-950/30 rounded-2xl border border-zinc-800/50 overflow-hidden transition-all duration-300">
+                        <div onClick={() => toggleCategory(category.id)} className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-800/40 transition-colors group select-none">
+                          <div className="flex items-center gap-3">
+                            <span className="text-xl">{category.icon}</span>
+                            <h3 className="text-[11px] font-black text-zinc-400 uppercase tracking-widest group-hover:text-yellow-500 transition-colors">{category.title}</h3>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-bold text-zinc-500">{foodsInCategory.length} Öğün</span>
+                            <span className={`text-zinc-500 text-xs transition-transform duration-300 ${isExpanded ? 'rotate-180 text-yellow-500' : ''}`}>▼</span>
+                          </div>
+                        </div>
+                        {isExpanded && (
+                          <div className="p-4 pt-0 space-y-3 border-t border-zinc-800/30 animate-in slide-in-from-top-2 duration-300">
+                            {foodsInCategory.map((food) => (
+                              <div key={food.id} className="relative bg-zinc-800/40 p-4 pr-12 rounded-xl border border-zinc-700/30 flex justify-between items-center group hover:bg-zinc-800/70 hover:border-yellow-500/30 transition-all">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-bold text-zinc-200 truncate">{food.cleanName}</p>
+                                  <p className="text-[10px] text-zinc-500 uppercase mt-1">{food.protein.toFixed(1)}P • {food.carbs.toFixed(1)}C • {food.fat.toFixed(1)}Y</p>
+                                </div>
+                                <div className="flex items-center flex-shrink-0">
+                                  <span className="text-xs font-black text-yellow-500 whitespace-nowrap">{food.calories < 0 ? `🔥 ${Math.abs(food.calories).toFixed(0)}` : food.calories.toFixed(0)} kcal</span>
+                                </div>
+                                <button onClick={(e) => { e.stopPropagation(); handleDelete(food.id); }} className="absolute right-4 text-red-500 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:scale-125 transition-all p-2" title="Öğünü Sil">✖</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RAPOR YAZDIRMA MODALI */}
+        {reportData && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm print:bg-white print:block print:inset-auto print:relative print:p-0">
+            <div className="bg-zinc-900 border border-zinc-700 w-full max-w-2xl rounded-3xl p-10 print:bg-white print:text-black print:border-none print:shadow-none print:w-full print:max-w-full">
+              <div className="flex justify-between items-center mb-8 border-b border-zinc-800 pb-6 print:border-gray-200">
+                <div>
+                  <h2 className="text-3xl font-black italic tracking-tighter text-white print:text-black">BEAR<span className="text-yellow-500 print:text-black">TRACK</span></h2>
+                  <p className="text-xs font-bold tracking-widest uppercase text-zinc-500 mt-1">Haftalık Analiz Raporu</p>
+                </div>
+                <button onClick={() => setReportData(null)} className="text-zinc-500 hover:text-white text-3xl print:hidden">×</button>
+              </div>
+              <div className="space-y-8">
+                <div className="bg-zinc-800/30 border border-zinc-700/50 p-6 rounded-2xl print:bg-gray-50 print:border-gray-300">
+                  <h3 className="text-[10px] uppercase tracking-widest font-black text-yellow-500 mb-4 print:text-black">Vanguard Performans Özeti</h3>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div><p className="text-xs text-zinc-400 uppercase tracking-wider mb-1 print:text-gray-500">Antrenman Günü</p><p className="text-2xl font-black text-white print:text-black">{reportData.data.workout_count} Gün</p></div>
+                    <div><p className="text-xs text-zinc-400 uppercase tracking-wider mb-1 print:text-gray-500">Haftalık Toplam Set</p><p className="text-2xl font-black text-blue-500 print:text-black">{reportData.data.total_sets} Set</p></div>
+                    <div><p className="text-xs text-zinc-400 uppercase tracking-wider mb-1 print:text-gray-500">Ort. Günlük Kalori</p><p className="text-2xl font-black text-yellow-500 print:text-black">{reportData.data.avg_kcal} kcal</p></div>
+                    <div><p className="text-xs text-zinc-400 uppercase tracking-wider mb-1 print:text-gray-500">Ort. Günlük Protein</p><p className="text-2xl font-black text-green-500 print:text-black">{reportData.data.avg_protein} g</p></div>
+                  </div>
+                </div>
+                <div className="bg-zinc-950 p-6 rounded-2xl border border-zinc-800 print:bg-white print:border-gray-300">
+                  <h3 className="text-[10px] uppercase tracking-widest font-black text-red-500 mb-3 flex items-center gap-2 print:text-black"><span className="w-2 h-2 bg-red-500 rounded-full animate-pulse print:hidden"></span>Vanguard Askeri Değerlendirme</h3>
+                  <p className="text-sm leading-relaxed text-zinc-300 italic font-medium print:text-black print:not-italic">"{reportData.ai_comment}"</p>
+                </div>
+                <div className="flex justify-end gap-4 mt-8 print:hidden">
+                  <button onClick={() => setReportData(null)} className="px-6 py-3 font-bold text-zinc-400 hover:text-white transition-colors">KAPAT</button>
+                  <button onClick={handlePrint} className="bg-blue-500 hover:bg-blue-400 text-white font-black px-8 py-3 rounded-xl transition-all uppercase tracking-widest shadow-lg">🖨️ PDF OLARAK İNDİR</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* KALİBRASYON & PROFİL MODALI */}
+        {isProfileOpen && (
+          <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[100] backdrop-blur-md print:hidden">
+            <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-8 md:p-10 w-full max-w-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row gap-8">
+              
+              <div className="flex-1 overflow-y-auto max-h-[75vh] pr-2 [&::-webkit-scrollbar]:hidden">
+                <div className="flex justify-between items-center mb-8">
+                  <h3 className="text-3xl font-black text-white italic">SİSTEM <span className="text-yellow-500">KALİBRASYONU</span></h3>
+                  <button onClick={() => setIsProfileOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl md:hidden">×</button>
+                </div>
+                
+                <form onSubmit={saveProfile} className="space-y-5">
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Kilo (kg)</label>
+                      <input type="number" required value={profile.weight} onChange={(e) => setProfile({...profile, weight: e.target.value === "" ? ("" as any) : Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Boy (cm)</label>
+                      <input type="number" required value={profile.height} onChange={(e) => setProfile({...profile, height: e.target.value === "" ? ("" as any) : Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Yaş</label>
+                      <input type="number" required value={profile.age} onChange={(e) => setProfile({...profile, age: e.target.value === "" ? ("" as any) : Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Hedef</label>
+                      <select value={profile.goal} onChange={(e) => setProfile({...profile, goal: e.target.value})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none">
+                        <option value="cut">Definasyon (-500)</option>
+                        <option value="maintain">Koruma (0)</option>
+                        <option value="bulk">Bulk (+500)</option>
+                      </select>
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Boy (cm)</label>
-                    <input type="number" required value={profile.height} onChange={(e) => setProfile({...profile, height: e.target.value === "" ? ("" as any) : Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Yaş</label>
-                    <input type="number" required value={profile.age} onChange={(e) => setProfile({...profile, age: e.target.value === "" ? ("" as any) : Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Hedef</label>
-                    <select value={profile.goal} onChange={(e) => setProfile({...profile, goal: e.target.value})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none">
-                      <option value="cut">Definasyon (-500)</option>
-                      <option value="maintain">Koruma (0)</option>
-                      <option value="bulk">Bulk (+500)</option>
+                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Aktivite Seviyesi</label>
+                    <select value={profile.activity} onChange={(e) => setProfile({...profile, activity: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none">
+                      <option value={1.2}>Masa Başı / Hareketsiz</option>
+                      <option value={1.375}>Hafif Egzersiz (1-3 gün)</option>
+                      <option value={1.55}>Orta Egzersiz (3-5 gün)</option>
+                      <option value={1.725}>Ağır Egzersiz (6-7 gün)</option>
                     </select>
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Aktivite Seviyesi</label>
-                  <select value={profile.activity} onChange={(e) => setProfile({...profile, activity: Number(e.target.value)})} className="w-full bg-black border border-zinc-700 rounded-xl p-4 text-white focus:border-yellow-500 focus:outline-none">
-                    <option value={1.2}>Masa Başı / Hareketsiz</option>
-                    <option value={1.375}>Hafif Egzersiz (1-3 gün)</option>
-                    <option value={1.55}>Orta Egzersiz (3-5 gün)</option>
-                    <option value={1.725}>Ağır Egzersiz (6-7 gün)</option>
-                  </select>
-                </div>
-                <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl mt-4 transition-colors">KALİBRASYONU ONAYLA</button>
-              </form>
-
-              {/* --- YENİ EKLENEN: ŞİFRE DEĞİŞTİRME BÖLÜMÜ --- */}
-              <div className="mt-8 pt-8 border-t border-zinc-800/80">
-                <h4 className="text-lg font-black text-white italic mb-4">GÜVENLİK <span className="text-red-500">AYARLARI</span></h4>
-                <form onSubmit={handlePasswordChange} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Mevcut Şifre</label>
-                      <input type="password" required value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-red-500 focus:outline-none" placeholder="••••••••" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Yeni Şifre</label>
-                      <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-red-500 focus:outline-none" placeholder="••••••••" />
-                    </div>
-                  </div>
-                  
-                  {passwordChangeMessage.text && (
-                    <div className={`p-3 rounded-xl text-xs font-bold uppercase tracking-wider text-center ${passwordChangeMessage.type === 'error' ? 'bg-red-500/10 text-red-500 border border-red-500/30' : 'bg-green-500/10 text-green-500 border border-green-500/30'}`}>
-                      {passwordChangeMessage.text}
-                    </div>
-                  )}
-
-                  <button type="submit" disabled={isPasswordChanging} className="w-full bg-zinc-800 hover:bg-red-600 disabled:bg-zinc-900 disabled:text-zinc-600 border border-zinc-700 hover:border-red-500 text-white font-black py-3 rounded-xl transition-all uppercase tracking-widest text-sm">
-                    {isPasswordChanging ? "GÜNCELLENİYOR..." : "ŞİFREYİ DEĞİŞTİR"}
-                  </button>
+                  <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl mt-4 transition-colors">KALİBRASYONU ONAYLA</button>
                 </form>
+
+                <div className="mt-8 pt-8 border-t border-zinc-800/80">
+                  <h4 className="text-lg font-black text-white italic mb-4">GÜVENLİK <span className="text-red-500">AYARLARI</span></h4>
+                  <form onSubmit={handlePasswordChange} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Mevcut Şifre</label>
+                        <input type="password" required value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-red-500 focus:outline-none" placeholder="••••••••" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Yeni Şifre</label>
+                        <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-red-500 focus:outline-none" placeholder="••••••••" />
+                      </div>
+                    </div>
+                    
+                    {passwordChangeMessage.text && (
+                      <div className={`p-3 rounded-xl text-xs font-bold uppercase tracking-wider text-center ${passwordChangeMessage.type === 'error' ? 'bg-red-500/10 text-red-500 border border-red-500/30' : 'bg-green-500/10 text-green-500 border border-green-500/30'}`}>
+                        {passwordChangeMessage.text}
+                      </div>
+                    )}
+
+                    <button type="submit" disabled={isPasswordChanging} className="w-full bg-zinc-800 hover:bg-red-600 disabled:bg-zinc-900 disabled:text-zinc-600 border border-zinc-700 hover:border-red-500 text-white font-black py-3 rounded-xl transition-all uppercase tracking-widest text-sm">
+                      {isPasswordChanging ? "GÜNCELLENİYOR..." : "ŞİFREYİ DEĞİŞTİR"}
+                    </button>
+                  </form>
+                </div>
+
               </div>
-              {/* ------------------------------------------- */}
 
-            </div>
-
-            <div className="w-full md:w-64 bg-black/50 rounded-2xl p-6 border border-zinc-800 flex flex-col justify-start relative mt-4 md:mt-0">
-              <div className="absolute top-0 right-0 p-4"><button onClick={() => setIsProfileOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl hidden md:block">×</button></div>
-              <h4 className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-6 border-b border-zinc-800 pb-2">CANLI HESAPLAMA</h4>
-              <div className="space-y-4">
-                <div><p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">Bazal (BMR)</p><p className="text-lg font-black text-zinc-300">{BMR.toFixed(0)} <span className="text-xs text-zinc-600">kcal</span></p></div>
-                <div><p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">Günlük İhtiyaç (TDEE)</p><p className="text-lg font-black text-zinc-300">{TDEE.toFixed(0)} <span className="text-xs text-zinc-600">kcal</span></p></div>
-                <div className="pt-2 border-t border-zinc-800/50"><p className="text-xs text-yellow-500 uppercase font-black tracking-wider mb-1">HEDEF MAKROLAR</p><p className="text-2xl font-black text-white">{CALORIE_GOAL} <span className="text-xs text-zinc-500">kcal</span></p></div>
+              <div className="w-full md:w-64 bg-black/50 rounded-2xl p-6 border border-zinc-800 flex flex-col justify-start relative mt-4 md:mt-0">
+                <div className="absolute top-0 right-0 p-4"><button onClick={() => setIsProfileOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl hidden md:block">×</button></div>
+                <h4 className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-6 border-b border-zinc-800 pb-2">CANLI HESAPLAMA</h4>
+                <div className="space-y-4">
+                  <div><p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">Bazal (BMR)</p><p className="text-lg font-black text-zinc-300">{BMR.toFixed(0)} <span className="text-xs text-zinc-600">kcal</span></p></div>
+                  <div><p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">Günlük İhtiyaç (TDEE)</p><p className="text-lg font-black text-zinc-300">{TDEE.toFixed(0)} <span className="text-xs text-zinc-600">kcal</span></p></div>
+                  <div className="pt-2 border-t border-zinc-800/50"><p className="text-xs text-yellow-500 uppercase font-black tracking-wider mb-1">HEDEF MAKROLAR</p><p className="text-2xl font-black text-white">{CALORIE_GOAL} <span className="text-xs text-zinc-500">kcal</span></p></div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* AI MODALI */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 backdrop-blur-md print:hidden">
-          <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-10 w-full max-w-lg shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-3xl font-black text-white italic">BEAR AI <span className="text-yellow-500">ANALİZ</span></h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl">×</button>
-            </div>
-            
-            <form onSubmit={handleAISubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Hangi Öğün?</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {["Sabah", "Öğle", "Ara Öğün", "Akşam"].map((meal) => (
-                    <button type="button" key={meal} onClick={() => setMealType(meal)} className={`py-3 rounded-xl font-bold text-sm border ${mealType === meal ? "bg-yellow-500 text-black border-yellow-400" : "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>{meal}</button>
-                  ))}
-                </div>
+        {/* AI MODALI */}
+        {isModalOpen && (
+          <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 backdrop-blur-md print:hidden">
+            <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-10 w-full max-w-lg shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+              <div className="flex justify-between items-center mb-8">
+                <h3 className="text-3xl font-black text-white italic">BEAR AI <span className="text-yellow-500">ANALİZ</span></h3>
+                <button onClick={() => setIsModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl">×</button>
               </div>
-              {favoritesList.length > 0 && (
+              
+              <form onSubmit={handleAISubmit} className="space-y-6">
                 <div>
-                  <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Sık Yenenler ⚡</label>
-                  <div className="flex flex-wrap gap-2">
-                    {favoritesList.map((fav, i) => (
-                      <button key={i} type="button" onClick={() => addFavorite(fav)} className="bg-zinc-800 hover:bg-yellow-500 hover:text-black border border-zinc-700 px-3 py-2 rounded-lg text-[11px] font-bold">{fav.food_name.split("::")[1] || fav.food_name}</button>
+                  <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Hangi Öğün?</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {["Sabah", "Öğle", "Ara Öğün", "Akşam"].map((meal) => (
+                      <button type="button" key={meal} onClick={() => setMealType(meal)} className={`py-3 rounded-xl font-bold text-sm border ${mealType === meal ? "bg-yellow-500 text-black border-yellow-400" : "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>{meal}</button>
                     ))}
                   </div>
                 </div>
-              )}
-              <div>
-                <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Ne Yedin?</label>
-                <textarea required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Örn: 200g ızgara tavuk göğsü..." className="w-full bg-black border border-zinc-700 rounded-2xl p-5 text-white focus:border-yellow-500 min-h-[120px] text-lg" />
-              </div>
-              <button type="submit" disabled={isLoading} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black py-5 rounded-2xl text-lg">
-                {isLoading ? "HESAPLANIYOR..." : "SİSTEME İŞLE 🐻"}
-              </button>
-            </form>
+                {favoritesList.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Sık Yenenler ⚡</label>
+                    <div className="flex flex-wrap gap-2">
+                      {favoritesList.map((fav, i) => (
+                        <button key={i} type="button" onClick={() => addFavorite(fav)} className="bg-zinc-800 hover:bg-yellow-500 hover:text-black border border-zinc-700 px-3 py-2 rounded-lg text-[11px] font-bold">{fav.food_name.split("::")[1] || fav.food_name}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Ne Yedin?</label>
+                  <textarea required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Örn: 200g ızgara tavuk göğsü..." className="w-full bg-black border border-zinc-700 rounded-2xl p-5 text-white focus:border-yellow-500 min-h-[120px] text-lg" />
+                </div>
+                <button type="submit" disabled={isLoading} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black py-5 rounded-2xl text-lg">
+                  {isLoading ? "HESAPLANIYOR..." : "SİSTEME İŞLE 🐻"}
+                </button>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-    </main>
+        )}
+      </main>
+    </GoogleOAuthProvider>
   ); 
 }

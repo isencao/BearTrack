@@ -78,4 +78,4 @@ Thumbs.db
 /pgdata/
 
 *.pyc
-
+.env.local
