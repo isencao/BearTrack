@@ -9,7 +9,7 @@ export default function NutritionPage() {
   const API_BASE = "https://beartrack.onrender.com"; // Localde isen http://localhost:8000 yapmayı unutma
   
   
-  const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+  const GOOGLE_CLIENT_ID = "468594340745-3ec5jnpom6u4icmn9fd1tjogqkfrblt6.apps.googleusercontent.com";
 
   // --- AUTH (GÜVENLİK) STATE'LERİ ---
   const [token, setToken] = useState<string | null>(null);
