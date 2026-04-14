@@ -16,6 +16,10 @@ import bear_auth
 from database import create_db_and_tables, get_session
 from repository import WorkoutRepository, FoodRepository, ReportRepository, AuthRepository
 
+# --- YENİ EKLENEN: GOOGLE KÜTÜPHANELERİ ---
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
 load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
@@ -43,11 +47,13 @@ class UserRegister(BaseModel):
 class ResetRequest(BaseModel):
     username: str
 
-# --- YENİ EKLENEN: Şifre Değiştirme Modeli ---
 class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
-# ---------------------------------------------
+
+# --- YENİ EKLENEN: GOOGLE GİRİŞ MODELİ ---
+class GoogleAuthRequest(BaseModel):
+    token: str
 
 app.add_middleware(
     CORSMiddleware,
@@ -142,28 +148,68 @@ def reset_password_demo(request: ResetRequest, session: Session = Depends(get_se
         "temp_password": temp_password
     }
 
-# --- YENİ EKLENEN: ŞİFRE DEĞİŞTİRME UCU ---
 @app.post("/api/auth/change-password")
 def change_password(
     request: ChangePasswordRequest, 
     session: Session = Depends(get_session), 
     current_user: models.User = Depends(get_current_user)
 ):
-    # 1. Eski şifrenin doğruluğunu kontrol et
     if not bear_auth.verify_password(request.old_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Mevcut şifreniz yanlış.")
     
-    # 2. Yeni şifre eskiyle aynı mı kontrol et
     if request.old_password == request.new_password:
         raise HTTPException(status_code=400, detail="Yeni şifreniz eskisiyle aynı olamaz.")
 
-    # 3. Şifreyi şifrele ve kaydet
     current_user.hashed_password = bear_auth.get_password_hash(request.new_password)
     session.add(current_user)
     session.commit()
     
     return {"status": "success", "message": "Şifreniz başarıyla güncellendi!"}
-# ------------------------------------------
+
+# --- YENİ EKLENEN: GOOGLE GİRİŞ UCU ---
+@app.post("/api/auth/google")
+def google_auth(request: GoogleAuthRequest, session: Session = Depends(get_session)):
+    try:
+        # 1. Google'dan gelen token'ı doğrula
+        idinfo = id_token.verify_oauth2_token(
+            request.token, 
+            google_requests.Request(), 
+            os.getenv("GOOGLE_CLIENT_ID")
+        )
+        
+        email = idinfo['email']
+        # Google'dan gelen ismi al, ad/soyad yoksa mailin başını kullan
+        name = idinfo.get('given_name', email.split('@')[0])
+        # Sistemimiz boşluksuz ve küçük harf seviyor:
+        username = name.replace(" ", "").lower()
+        
+        # 2. Bu maille daha önce kayıt olunmuş mu?
+        user = AuthRepository.get_user_by_email(session, email)
+        
+        if not user:
+            # 3. Kullanıcı yoksa YENİ KAYIT oluştur
+            random_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
+            hashed_pw = bear_auth.get_password_hash(random_password)
+            
+            # Eğer bu username'den başka biri varsa sonuna rastgele sayı ekle
+            existing_user = AuthRepository.get_user_by_username(session, username)
+            if existing_user:
+                username = f"{username}_{secrets.choice(string.digits)}{secrets.choice(string.digits)}"
+            
+            user = models.User(
+                username=username,
+                email=email,
+                hashed_password=hashed_pw
+            )
+            AuthRepository.create_user(session, user)
+        
+        # 4. Her şey tamamsa, BearTrack'in kendi anahtarını ver ve içeri al!
+        access_token = bear_auth.create_access_token(data={"sub": user.username}) 
+        return {"access_token": access_token, "token_type": "bearer"}
+
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Google doğrulaması başarısız.")
+# --------------------------------------
 
 @app.get("/api/food/")
 def get_all_foods(session: Session = Depends(get_session), current_user: models.User = Depends(get_current_user)):
