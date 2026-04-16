@@ -15,8 +15,10 @@ import models
 import bear_auth
 from database import create_db_and_tables, get_session
 from repository import WorkoutRepository, FoodRepository, ReportRepository, AuthRepository
-
-# --- YENİ EKLENEN: GOOGLE KÜTÜPHANELERİ ---
+from fastapi import UploadFile, File, Form
+from PIL import Image
+import pytesseract
+import io
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
@@ -320,3 +322,67 @@ def update_profile(data: ProfileUpdate, session: Session = Depends(get_session),
 @app.get("/api/profile")
 def get_profile(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+@app.post("/api/food/ocr-analyze")
+async def ocr_analyze(
+    file: UploadFile = File(...),
+    meal_type: str = Form(...),
+    date: str = Form(...),
+    session: Session = Depends(get_session),
+    current_user: models.User = Depends(get_current_user)
+):
+    try:
+        # 1. Gelen resmi oku
+        request_object_content = await file.read()
+        img = Image.open(io.BytesIO(request_object_content))
+
+        # 2. Tesseract ile metne çevir (Ham Metin)
+        # Not: Yerelde hata alırsan pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe' eklemen gerekebilir.
+        raw_text = pytesseract.image_to_string(img, lang='tur+eng')
+
+        # 3. Llama 3.3'e "Bu gürültülü metni temizle ve bana makroları ver" de
+        prompt = f"""
+        Sen profesyonel bir besin analisti ve OCR temizleme uzmanısın. 
+        Aşağıdaki metin bir besin değerleri tablosunun OCR çıktısıdır. Metin gürültülü (hatalı karakterler) olabilir.
+        Lütfen bu verileri analiz et ve 100g/porsiyon başına olan değerleri çıkar.
+
+        OCR ÇIKTISI:
+        "{raw_text}"
+
+        KURALLAR:
+        1. Sadece şu JSON formatında cevap ver: 
+        {{
+            "food_name": "Ürün İsmi",
+            "calories": kcal_degeri,
+            "protein": g,
+            "carbs": g,
+            "fat": g
+        }}
+        2. Eğer isim net değilse genel bir isim ver.
+        """
+
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            response_format={"type": "json_object"}
+        )
+        
+        res_data = json.loads(chat_completion.choices[0].message.content)
+        
+        # 4. Veritabanına kaydet (Ön yüzle uyumlu olması için formatla)
+        food_payload = {
+            "food_name": f"{meal_type}::{res_data['food_name']}",
+            "calories": res_data['calories'],
+            "protein": res_data['protein'],
+            "carbs": res_data['carbs'],
+            "fat": res_data['fat'],
+            "date": date
+        }
+        
+        FoodRepository.add_entry(session, food_payload, current_user.id)
+
+        return {"status": "success", "data": res_data}
+
+    except Exception as e:
+        print(f"OCR Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Görsel analiz edilemedi: {str(e)}")
