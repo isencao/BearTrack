@@ -6,12 +6,10 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 export default function NutritionPage() {
   const router = useRouter();
-  const API_BASE = "https://beartrack.onrender.com"; // Localde isen http://localhost:8000 yapmayı unutma
+  const API_BASE = "https://beartrack.onrender.com"; // Localde isen http://localhost:8000
   
-  
-  const GOOGLE_CLIENT_ID = "468594340745-3ec5jnpom6u4icmn9fd1tjogqkfrblt6.apps.googleusercontent.com";
+  const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "senin-id-burada-olabilir";
 
-  // --- AUTH (GÜVENLİK) STATE'LERİ ---
   const [token, setToken] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(true); 
   const [authMode, setAuthMode] = useState<"login" | "register" | "forgotPassword">("login");
@@ -22,7 +20,6 @@ export default function NutritionPage() {
   const [authSuccess, setAuthSuccess] = useState(""); 
   const [authLoading, setAuthLoading] = useState(false);
 
-  // --- ŞİFRE DEĞİŞTİRME STATE'LERİ ---
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [passwordChangeMessage, setPasswordChangeMessage] = useState({ text: "", type: "" });
@@ -31,6 +28,14 @@ export default function NutritionPage() {
   const [foods, setFoods] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  
+  // --- YENİ EKLENEN: AI & OCR STATE'LERİ ---
+  const [aiMode, setAiMode] = useState<"text" | "ocr">("text"); // Hangi sekmedeyiz?
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // -----------------------------------------
+
   const [description, setDescription] = useState("");
   const [mealType, setMealType] = useState("Sabah"); 
   const [isLoading, setIsLoading] = useState(false);
@@ -50,7 +55,6 @@ export default function NutritionPage() {
     "Sabah": true, "Öğle": true, "Ara Öğün": true, "Akşam": true, "Antrenman": true, "Diğer": true
   });
 
-  // --- BAŞLANGIÇ KONTROLLERİ ---
   useEffect(() => {
     const savedToken = localStorage.getItem("bearToken");
     if (savedToken) {
@@ -86,9 +90,6 @@ export default function NutritionPage() {
     return `${year}-${month}-${day}`;
   };
 
-  // ==========================================
-  // AUTH (GİRİŞ, KAYIT VE ŞİFRE SIFIRLAMA)
-  // ==========================================
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -142,12 +143,10 @@ export default function NutritionPage() {
     }
   };
 
-  // --- YENİ EKLENEN: GOOGLE GİRİŞİ BAŞARILI OLUNCA TETİKLENEN FONKSİYON ---
   const handleGoogleSuccess = async (credentialResponse: any) => {
     setAuthError("");
     setAuthLoading(true);
     try {
-      // Google'dan gelen bileti (token) kendi backendimize gönderiyoruz
       const res = await fetch(`${API_BASE}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -157,7 +156,6 @@ export default function NutritionPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Google girişi başarısız oldu.");
 
-      // Backend onayladı ve bize BearToken verdi, içeri alıyoruz!
       localStorage.setItem("bearToken", data.access_token);
       setToken(data.access_token);
       setIsAuthModalOpen(false);
@@ -168,7 +166,6 @@ export default function NutritionPage() {
       setAuthLoading(false);
     }
   };
-  // ----------------------------------------------------------------------
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,9 +207,6 @@ export default function NutritionPage() {
     setIsAuthModalOpen(true);
   };
 
-  // ==========================================
-  // API İŞLEMLERİ (TOKEN KORUMALI)
-  // ==========================================
   const authHeaders = { 
     "Content-Type": "application/json",
     "Authorization": `Bearer ${token}` 
@@ -334,10 +328,7 @@ export default function NutritionPage() {
         headers: authHeaders,
         body: JSON.stringify(aiData),
       });
-      setIsModalOpen(false);
-      setDescription("");
-      setMealType("Sabah"); 
-      setExpandedCategories(prev => ({ ...prev, [mealType]: true }));
+      closeModal();
       fetchData();
     } catch (err) {
       alert("AI Analiz hatası!");
@@ -345,6 +336,58 @@ export default function NutritionPage() {
       setIsLoading(false);
     }
   };
+
+  // --- YENİ EKLENEN: FOTOĞRAF SEÇİMİ VE OCR İŞLEMLERİ ---
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedImage(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleOCRSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedImage) return alert("Lütfen önce bir fotoğraf seçin.");
+    
+    setIsLoading(true);
+    try {
+      // 1. Resmi FormData'ya sar
+      const formData = new FormData();
+      formData.append("file", selectedImage);
+      formData.append("meal_type", mealType);
+      formData.append("date", getLocalISODate(selectedDate));
+
+      // 2. Arka plana (FastAPI OCR endpoint'ine) gönder
+      // Not: Bu endpoint'i henüz backend'de yazmadık, bu yüzden şimdilik 404 dönebilir
+      const res = await fetch(`${API_BASE}/api/food/ocr-analyze`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }, // FormData gönderirken Content-Type koyulmaz, tarayıcı ayarlar
+        body: formData
+      });
+
+      if (!res.ok) {
+         const errorData = await res.json();
+         throw new Error(errorData.detail || "OCR Tarama hatası.");
+      }
+
+      closeModal();
+      fetchData();
+    } catch (err: any) {
+      alert(`Tarama Başarısız: Backend hazır değilse normaldir! (${err.message})`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setDescription("");
+    setSelectedImage(null);
+    setImagePreview(null);
+    setAiMode("text");
+  };
+  // -----------------------------------------------------
 
   const addFavorite = async (fav: any) => {
     setIsLoading(true);
@@ -367,7 +410,7 @@ export default function NutritionPage() {
       
       setExpandedCategories(prev => ({ ...prev, [mealType]: true }));
       fetchData();
-      setIsModalOpen(false);
+      closeModal();
     } catch (err) {
       alert("Favori eklenirken hata oluştu.");
     } finally {
@@ -597,7 +640,6 @@ export default function NutritionPage() {
 
             </form>
 
-            {/* --- YENİ EKLENEN: GOOGLE GİRİŞ BUTONU --- */}
             {authMode === "login" && (
               <div className="mt-6 pt-6 border-t border-zinc-800/80">
                 <div className="flex justify-center w-full">
@@ -612,7 +654,6 @@ export default function NutritionPage() {
                 </div>
               </div>
             )}
-            {/* --------------------------------------- */}
 
           </div>
         </main>
@@ -620,7 +661,6 @@ export default function NutritionPage() {
     );
   }
 
-  // --- BURADAN AŞAĞISI STANDART SAYFA YAPISI, DEĞİŞMEDİ ---
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <main className="min-h-screen bg-black text-zinc-100 p-4 md:p-12 font-sans selection:bg-yellow-500 selection:text-black">
@@ -857,7 +897,6 @@ export default function NutritionPage() {
           </div>
         </div>
 
-        {/* RAPOR YAZDIRMA MODALI */}
         {reportData && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm print:bg-white print:block print:inset-auto print:relative print:p-0">
             <div className="bg-zinc-900 border border-zinc-700 w-full max-w-2xl rounded-3xl p-10 print:bg-white print:text-black print:border-none print:shadow-none print:w-full print:max-w-full">
@@ -891,7 +930,6 @@ export default function NutritionPage() {
           </div>
         )}
 
-        {/* KALİBRASYON & PROFİL MODALI */}
         {isProfileOpen && (
           <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[100] backdrop-blur-md print:hidden">
             <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-8 md:p-10 w-full max-w-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row gap-8">
@@ -978,45 +1016,102 @@ export default function NutritionPage() {
           </div>
         )}
 
-        {/* AI MODALI */}
+        {/* --- YENİLENMİŞ AI & OCR MODALI --- */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 backdrop-blur-md print:hidden">
             <div className="bg-zinc-900 border border-zinc-700 rounded-[2.5rem] p-10 w-full max-w-lg shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-3xl font-black text-white italic">BEAR AI <span className="text-yellow-500">ANALİZ</span></h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors text-2xl">×</button>
+              
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-3xl font-black text-white italic">BEAR <span className="text-yellow-500">ANALİZ</span></h3>
+                <button onClick={closeModal} className="text-zinc-500 hover:text-white transition-colors text-2xl">×</button>
+              </div>
+
+              {/* Sekme Butonları */}
+              <div className="flex gap-2 mb-8 bg-zinc-950 p-1 rounded-2xl border border-zinc-800">
+                <button type="button" onClick={() => setAiMode("text")} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${aiMode === "text" ? "bg-yellow-500 text-black shadow-md" : "text-zinc-500 hover:text-white"}`}>
+                  📝 METİN
+                </button>
+                <button type="button" onClick={() => setAiMode("ocr")} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${aiMode === "ocr" ? "bg-yellow-500 text-black shadow-md" : "text-zinc-500 hover:text-white"}`}>
+                  📸 FOTOĞRAF (OCR)
+                </button>
               </div>
               
-              <form onSubmit={handleAISubmit} className="space-y-6">
+              <form onSubmit={aiMode === "text" ? handleAISubmit : handleOCRSubmit} className="space-y-6">
                 <div>
                   <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Hangi Öğün?</label>
                   <div className="grid grid-cols-2 gap-3">
                     {["Sabah", "Öğle", "Ara Öğün", "Akşam"].map((meal) => (
-                      <button type="button" key={meal} onClick={() => setMealType(meal)} className={`py-3 rounded-xl font-bold text-sm border ${mealType === meal ? "bg-yellow-500 text-black border-yellow-400" : "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>{meal}</button>
+                      <button type="button" key={meal} onClick={() => setMealType(meal)} className={`py-3 rounded-xl font-bold text-sm border transition-colors ${mealType === meal ? "bg-yellow-500 text-black border-yellow-400" : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700"}`}>
+                        {meal}
+                      </button>
                     ))}
                   </div>
                 </div>
-                {favoritesList.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Sık Yenenler ⚡</label>
-                    <div className="flex flex-wrap gap-2">
-                      {favoritesList.map((fav, i) => (
-                        <button key={i} type="button" onClick={() => addFavorite(fav)} className="bg-zinc-800 hover:bg-yellow-500 hover:text-black border border-zinc-700 px-3 py-2 rounded-lg text-[11px] font-bold">{fav.food_name.split("::")[1] || fav.food_name}</button>
-                      ))}
+
+                {/* METİN SEKMESİ İÇERİĞİ */}
+                {aiMode === "text" && (
+                  <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+                    {favoritesList.length > 0 && (
+                      <div className="mb-6">
+                        <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Sık Yenenler ⚡</label>
+                        <div className="flex flex-wrap gap-2">
+                          {favoritesList.map((fav, i) => (
+                            <button key={i} type="button" onClick={() => addFavorite(fav)} className="bg-zinc-800 hover:bg-yellow-500 hover:text-black border border-zinc-700 px-3 py-2 rounded-lg text-[11px] font-bold">{fav.food_name.split("::")[1] || fav.food_name}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Ne Yedin?</label>
+                      <textarea required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Örn: 200g ızgara tavuk göğsü..." className="w-full bg-black border border-zinc-700 rounded-2xl p-5 text-white focus:border-yellow-500 min-h-[120px] text-lg transition-colors" />
                     </div>
                   </div>
                 )}
-                <div>
-                  <label className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">Ne Yedin?</label>
-                  <textarea required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Örn: 200g ızgara tavuk göğsü..." className="w-full bg-black border border-zinc-700 rounded-2xl p-5 text-white focus:border-yellow-500 min-h-[120px] text-lg" />
-                </div>
-                <button type="submit" disabled={isLoading} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black py-5 rounded-2xl text-lg">
-                  {isLoading ? "HESAPLANIYOR..." : "SİSTEME İŞLE 🐻"}
+
+                {/* FOTOĞRAF (OCR) SEKMESİ İÇERİĞİ */}
+                {aiMode === "ocr" && (
+                  <div className="animate-in fade-in slide-in-from-left-2 duration-300 flex flex-col items-center space-y-4">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      capture="environment" // Mobilde direkt kamerayı açmayı tetikler
+                      ref={fileInputRef} 
+                      onChange={handleImageChange} 
+                      className="hidden" 
+                    />
+                    
+                    {imagePreview ? (
+                      <div className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-dashed border-yellow-500 group">
+                        <img src={imagePreview} alt="Taranacak Besin" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button type="button" onClick={() => fileInputRef.current?.click()} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-2 px-4 rounded-xl text-sm">
+                            FOTOĞRAFI DEĞİŞTİR
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button 
+                        type="button" 
+                        onClick={() => fileInputRef.current?.click()} 
+                        className="w-full h-40 bg-zinc-950 hover:bg-zinc-900 border-2 border-dashed border-zinc-700 hover:border-yellow-500 rounded-2xl flex flex-col items-center justify-center gap-3 transition-colors group"
+                      >
+                        <span className="text-4xl group-hover:scale-110 transition-transform">📸</span>
+                        <span className="text-sm font-bold text-zinc-400 group-hover:text-yellow-500 uppercase tracking-widest">
+                          Besin Tablosunu Çek / Yükle
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <button type="submit" disabled={isLoading} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black py-5 rounded-2xl text-lg uppercase tracking-widest transition-all">
+                  {isLoading ? "BEARGUARD ANALİZ EDİYOR..." : (aiMode === "text" ? "SİSTEME İŞLE 🐻" : "TARA VE İŞLE 📸")}
                 </button>
               </form>
             </div>
           </div>
         )}
+
       </main>
     </GoogleOAuthProvider>
   ); 
