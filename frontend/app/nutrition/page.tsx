@@ -6,7 +6,7 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 export default function NutritionPage() {
   const router = useRouter();
-  const API_BASE = "https://beartrack.onrender.com"; // Localde isen http://localhost:8000
+  const API_BASE = "https://beartrack-2.onrender.com";
   
   const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "senin-id-burada-olabilir";
 
