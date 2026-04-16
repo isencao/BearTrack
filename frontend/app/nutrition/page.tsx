@@ -184,7 +184,7 @@ export default function NutritionPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Sıfırlama başarısız.");
       
-      setAuthSuccess(`Sistem Onayı! Geçici şifreniz: ${data.temp_password}`);
+      setAuthSuccess(data.message);
       setTimeout(() => { setAuthMode("login"); setAuthSuccess(""); }, 8000); 
     } catch (err: any) {
       setAuthError(err.message);

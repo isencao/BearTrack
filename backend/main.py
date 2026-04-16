@@ -21,6 +21,9 @@ import pytesseract
 import io
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -130,25 +133,71 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), ses
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/api/auth/reset-demo")
-def reset_password_demo(request: ResetRequest, session: Session = Depends(get_session)):
+def reset_password_email(request: ResetRequest, session: Session = Depends(get_session)):
     user = AuthRepository.get_user_by_username(session, request.username)
     if not user:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
     
+    # 1. Rastgele 8 haneli şifre üret
     alphabet = string.ascii_letters + string.digits
     temp_password = ''.join(secrets.choice(alphabet) for i in range(8))
     
+    # 2. Şifreyi veritabanında güncelle
     hashed_pw = bear_auth.get_password_hash(temp_password)
     user.hashed_password = hashed_pw
-    
     session.add(user)
     session.commit()
     
-    return {
-        "success": True, 
-        "message": "Demo Modu: Şifre rastgele olarak sıfırlandı.", 
-        "temp_password": temp_password
-    }
+    # 3. Mail ayarlarını Render'dan çek
+    sender_email = os.getenv("EMAIL_SENDER")
+    sender_password = os.getenv("EMAIL_PASSWORD")
+    receiver_email = user.email
+
+    # Eğer Render ayarları yapılmamışsa sistemi çökertme, eski usul ekranda göster
+    if not sender_email or not sender_password:
+        return {
+            "success": True, 
+            "message": f"Mail ayarları eksik! Geçici şifreniz: {temp_password}"
+        }
+
+    # 4. Maili Gönder
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = receiver_email
+        msg['Subject'] = "BearTrack - Şifre Sıfırlama Talebi"
+
+        body = f"""
+        Merhaba {user.username},
+        
+        BearTrack Vanguard OS hesabın için şifre sıfırlama talebi aldık.
+        
+        Yeni geçici şifren: {temp_password}
+        
+        Lütfen sisteme giriş yaptıktan sonra profil (Güvenlik) ayarlarından şifreni değiştirmeyi unutma.
+        
+        Güvenle kal,
+        Bearguard Security Protocol
+        """
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+
+        # Gmail sunucusuna bağlan ve ateşle
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+        server.quit()
+
+        # E-postanın sadece başını ve sonunu göstererek (güvenlik için) mesaj dön
+        masked_email = f"{receiver_email[:2]}***@{receiver_email.split('@')[1]}"
+        return {
+            "success": True, 
+            "message": f"Sistem Onayı! Yeni şifreniz {masked_email} adresine gönderildi."
+        }
+
+    except Exception as e:
+        print(f"Mail Error: {e}")
+        raise HTTPException(status_code=500, detail="Mail gönderilirken sunucu hatası oluştu.")
 
 @app.post("/api/auth/change-password")
 def change_password(
