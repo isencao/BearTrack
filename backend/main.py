@@ -138,29 +138,24 @@ def reset_password_email(request: ResetRequest, session: Session = Depends(get_s
     if not user:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
     
-    # 1. Rastgele 8 haneli şifre üret
     alphabet = string.ascii_letters + string.digits
     temp_password = ''.join(secrets.choice(alphabet) for i in range(8))
     
-    # 2. Şifreyi veritabanında güncelle
     hashed_pw = bear_auth.get_password_hash(temp_password)
     user.hashed_password = hashed_pw
     session.add(user)
     session.commit()
     
-    # 3. Mail ayarlarını Render'dan çek
     sender_email = os.getenv("EMAIL_SENDER")
     sender_password = os.getenv("EMAIL_PASSWORD")
     receiver_email = user.email
 
-    # Eğer Render ayarları yapılmamışsa sistemi çökertme, eski usul ekranda göster
     if not sender_email or not sender_password:
         return {
             "success": True, 
-            "message": f"Mail ayarları eksik! Geçici şifreniz: {temp_password}"
+            "message": f"Sistem Uyarısı: Mail ayarları eksik! Gecici Sifreniz: {temp_password}"
         }
 
-    # 4. Maili Gönder
     try:
         msg = MIMEMultipart()
         msg['From'] = sender_email
@@ -181,18 +176,16 @@ def reset_password_email(request: ResetRequest, session: Session = Depends(get_s
         """
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
 
-        # Gmail sunucusuna bağlan ve ateşle
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(sender_email, sender_password)
         server.send_message(msg)
         server.quit()
 
-        # E-postanın sadece başını ve sonunu göstererek (güvenlik için) mesaj dön
         masked_email = f"{receiver_email[:2]}***@{receiver_email.split('@')[1]}"
         return {
             "success": True, 
-            "message": f"Sistem Onayı! Yeni şifreniz {masked_email} adresine gönderildi."
+            "message": f"SİSTEM ONAYI! YENİ ŞİFRENİZ {masked_email} ADRESİNE GÖNDERİLDİ."
         }
 
     except Exception as e:
